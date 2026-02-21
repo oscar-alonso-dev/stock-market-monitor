@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE = "/api";
+const API_BASE = "http://localhost:8000";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const fmt = (n, dec = 2) => n != null && !isNaN(n) ? Number(n).toFixed(dec) : "—";
