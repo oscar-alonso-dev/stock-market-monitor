@@ -20,7 +20,7 @@ jobs:
 
       - name: comprobar codigo
         run:
-                  cd ./app
+                  cd  app
                   npm install
                   npm test  
 
