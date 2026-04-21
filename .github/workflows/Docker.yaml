@@ -56,8 +56,8 @@ jobs:
       - name: Montar contenedor Backend
         run: |
             docker run -d -p 8000:8000 --name backend ghcr.io/${{ github.repository_owner }}/aurum-backend:latest
-            sleep 5
-            curl --fail http://localhost:8000
+            sleep 30
+            curl --fail http://localhost:8000/health
             docker stop backend || true
             docker rm backend || true
 
@@ -80,6 +80,6 @@ jobs:
         run: |
             docker run -d -p 3000:3000 --name frontend ghcr.io/${{ github.repository_owner }}/aurum-frontend:latest
             sleep 5
-            curl --fail http://localhost:3000
+            curl --fail http://localhost:8000/health
             docker stop frontend || true
             docker rm frontend || true 
