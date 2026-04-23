@@ -78,7 +78,7 @@ jobs:
 
       - name: Montar contenedor Frontend
         run: |
-            docker run -d -p 3000:3000 --name frontend ghcr.io/${{ github.repository_owner }}/aurum-frontend:latest
+            docker run -d -p 3000:80 --name frontend ghcr.io/${{ github.repository_owner }}/aurum-frontend:latest
             sleep 5
             curl --fail http://localhost:3000
             docker stop frontend || true
