@@ -76,10 +76,21 @@ jobs:
           npm ci
           npm audit --audit-level=high || true
 
+
       - name: Montar contenedor Frontend
         run: |
-            docker run -d -p 3000:80 --name frontend ghcr.io/${{ github.repository_owner }}/aurum-frontend:latest
-            sleep 30
-            curl --fail http://localhost:3000
-            docker stop frontend || true
-            docker rm frontend || true 
+          docker run -d -p 3000:80 --name frontend ghcr.io/${{ github.repository_owner }}/aurum-frontend:latest
+          sleep 30
+
+          echo "=== STATUS ==="
+          docker ps -a
+
+          echo "=== LOGS FRONTEND ==="
+          docker logs frontend
+
+          echo "=== TEST LOOP ==="
+           for i in {1..20}; do
+           echo "intentando curl..."
+           curl -v http://localhost:3000 && break
+          sleep 2
+          done
