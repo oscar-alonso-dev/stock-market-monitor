@@ -1,4 +1,4 @@
-# 📈 Stock Market Monitor
+﻿# 📈 Stock Market Monitor
 
 > Dashboard profesional del mercado bursátil construido con **FastAPI**, **React**, **Docker** y **Kubernetes**. Datos de bolsa en tiempo real, métricas financieras, opiniones de analistas y gráficos interactivos — todo desplegado en un clúster de Kubernetes listo para producción.
 
@@ -141,6 +141,28 @@ minikube service stock-frontend
 
 ---
 
+## 🔄 CI/CD con GitHub Actions
+
+El proyecto ya incluye un workflow en GitHub Actions en `.github/workflows/Docker.yaml`.
+
+Actualmente el pipeline hace lo siguiente:
+
+- Se ejecuta en `push` a `main` y en `pull_request` contra `main`
+- Comprueba el código del backend con Python
+- Comprueba el build del frontend con Node.js
+- Construye las imágenes Docker de backend y frontend
+- Publica ambas imágenes en **GitHub Container Registry (GHCR)** cuando el evento es un `push`
+- Arranca los dos contenedores en el runner para validar que responden correctamente
+
+Imágenes generadas por el workflow:
+
+- `ghcr.io/<owner>/aurum-backend:latest`
+- `ghcr.io/<owner>/aurum-frontend:latest`
+
+Esto cubre la parte de **CI** y publicación de imágenes. El siguiente paso natural es añadir un job de **deploy** por SSH al servidor para ejecutar `docker compose pull` y `docker compose up -d`.
+
+---
+
 ## 🔌 Endpoints de la API
 
 | Método | Endpoint | Descripción |
@@ -190,7 +212,7 @@ minikube service stock-frontend
 | **Containerización** | Docker, Docker Compose |
 | **Orquestación** | Kubernetes, Minikube |
 | **Servidor web** | Nginx (Alpine) |
-| **CI/CD** | GitHub Actions (próximamente) |
+| **CI/CD** | GitHub Actions + GHCR |
 
 ---
 
@@ -210,7 +232,7 @@ minikube service stock-frontend
 - [ ] Datos financieros reales (EBITDA, EPS) via API premium
 - [ ] Autenticación de usuarios y portfolios personales
 - [ ] Alertas de precio y notificaciones
-- [ ] Pipeline CI/CD con GitHub Actions
+- [x] Pipeline CI/CD con GitHub Actions y publicación en GHCR
 - [ ] Despliegue en la nube (GKE / EKS)
 - [ ] Dominio propio y SSL
 
