@@ -1,693 +1,653 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { API_BASE } from "./config.js";
 
-const fmt    = (n,d=2)  => n!=null&&!isNaN(n)?Number(n).toFixed(d):"—";
-const fmtPct = n => n!=null&&!isNaN(n)?`${n>=0?"+":""}${Number(n).toFixed(2)}%`:"—";
-const MONO   = {fontFamily:"'JetBrains Mono',monospace"};
-const isCNMV = s => /^ES[A-Z0-9]{10}$/.test(s||""); // ISINs españoles → datos CNMV
+// ─── Utils ────────────────────────────────────────────────────────────────────
+const n4  = v => v != null && !isNaN(v) ? Number(v).toFixed(4) : "—";
+const n2  = v => v != null && !isNaN(v) ? Number(v).toFixed(2) : "—";
+const pct = v => v != null && !isNaN(v) ? `${v >= 0 ? "+" : ""}${Number(v).toFixed(2)}%` : "—";
+const mil = v => v != null && !isNaN(v) ? `${(v / 1e6).toFixed(0)} M€` : "—";
+const clr = v => v == null || isNaN(v) ? "#64748b" : v >= 0 ? "#16a34a" : "#dc2626";
+const MONO = { fontFamily: "ui-monospace,'JetBrains Mono',monospace" };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CATÁLOGO COMPLETO: 70+ fondos y ETFs
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CATALOG = [
-  // ── 💎 Value Español — ISINs oficiales CNMV (datos garantizados) ─────────────
-  {grp:"💎 Value Español",      symbol:"ES0169107098", name:"Cobas Internacional C FI",          mgr:"Cobas AM",           isin:"ES0169107098"},
-  {grp:"💎 Value Español",      symbol:"ES0169107049", name:"Cobas Selección FI",                mgr:"Cobas AM",           isin:"ES0169107049"},
-  {grp:"💎 Value Español",      symbol:"ES0169107056", name:"Cobas Grandes Compañías FI",        mgr:"Cobas AM",           isin:"ES0169107056"},
-  {grp:"💎 Value Español",      symbol:"ES0175897007", name:"azValor Internacional FI",          mgr:"azValor AM",         isin:"ES0175897007"},
-  {grp:"💎 Value Español",      symbol:"ES0175897031", name:"azValor Iberia FI",                 mgr:"azValor AM",         isin:"ES0175897031"},
-  {grp:"💎 Value Español",      symbol:"ES0147622002", name:"Magallanes European Equity M FI",   mgr:"Magallanes",         isin:"ES0147622002"},
-  {grp:"💎 Value Español",      symbol:"ES0147622010", name:"Magallanes Iberian Equity M FI",    mgr:"Magallanes",         isin:"ES0147622010"},
-  {grp:"💎 Value Español",      symbol:"ES0180790006", name:"Bestinver Internacional FI",        mgr:"Bestinver",          isin:"ES0180790006"},
-  {grp:"💎 Value Español",      symbol:"ES0180790014", name:"Bestinver Bolsa FI",                mgr:"Bestinver",          isin:"ES0180790014"},
-  {grp:"💎 Value Español",      symbol:"ES0180790030", name:"Bestinver Patrimonio FI",           mgr:"Bestinver",          isin:"ES0180790030"},
-  {grp:"💎 Value Español",      symbol:"ES0180792002", name:"True Value FI",                    mgr:"True Value AM",      isin:"ES0180792002"},
-  {grp:"💎 Value Español",      symbol:"ES0180792028", name:"True Value Small Caps FI",          mgr:"True Value AM",      isin:"ES0180792028"},
-  {grp:"💎 Value Español",      symbol:"ES0180560009", name:"Valentum FI",                       mgr:"Valentum AM",        isin:"ES0180560009"},
-  {grp:"💎 Value Español",      symbol:"ES0162870003", name:"Metavalor Internacional FI",        mgr:"Metagestión",        isin:"ES0162870003"},
-  {grp:"💎 Value Español",      symbol:"ES0180847002", name:"Horos Internacional FI",            mgr:"Horos AM",           isin:"ES0180847002"},
-  {grp:"💎 Value Español",      symbol:"ES0180717002", name:"Numantia Patrimonio Global FI",     mgr:"Numantia Gestión",   isin:"ES0180717002"},
-
-  // ── 🇪🇸 Indexados España — CNMV ───────────────────────────────────────────────
-  {grp:"🇪🇸 Indexados España",  symbol:"ES0114930029", name:"Santander Índice España FI",        mgr:"Santander AM",       isin:"ES0114930029"},
-  {grp:"🇪🇸 Indexados España",  symbol:"ES0112705026", name:"BBVA Bolsa Índice España FI",        mgr:"BBVA AM",            isin:"ES0112705026"},
-  {grp:"🇪🇸 Indexados España",  symbol:"ES0120400003", name:"CaixaBank Bolsa Índice España FI",   mgr:"CaixaBank AM",       isin:"ES0120400003"},
-  {grp:"🇪🇸 Indexados España",  symbol:"ES0162647008", name:"Bankinter Índice Español FI",        mgr:"Bankinter Gestión",  isin:"ES0162647008"},
-
-  // ── ⚖️ Mixtos España — CNMV ───────────────────────────────────────────────────
-  {grp:"⚖️ Mixtos España",      symbol:"ES0138569037", name:"Cartesio X FI",                     mgr:"Cartesio Inversiones",isin:"ES0138569037"},
-  {grp:"⚖️ Mixtos España",      symbol:"ES0138569011", name:"Cartesio Y FI",                     mgr:"Cartesio Inversiones",isin:"ES0138569011"},
-  {grp:"⚖️ Mixtos España",      symbol:"ES0149133000", name:"Belgravia Epsilon FI",               mgr:"Belgravia Capital",  isin:"ES0149133000"},
-
-  // ── 🌍 Indexados Globales — ETFs cotizados (Yahoo Finance) ────────────────────
-  {grp:"🌍 Indexados Globales", symbol:"IWDA.AS",      name:"iShares Core MSCI World UCITS ETF", mgr:"BlackRock",          isin:"IE00B4L5Y983"},
-  {grp:"🌍 Indexados Globales", symbol:"VWCE.DE",      name:"Vanguard FTSE All-World UCITS ETF", mgr:"Vanguard",           isin:"IE00BK5BQT80"},
-  {grp:"🌍 Indexados Globales", symbol:"SWRD.L",       name:"SPDR MSCI World UCITS ETF",         mgr:"State Street",       isin:"IE00BFY0GT14"},
-  {grp:"🌍 Indexados Globales", symbol:"ACWI",         name:"iShares MSCI ACWI ETF",             mgr:"BlackRock",          isin:"US4642872349"},
-  {grp:"🌍 Indexados Globales", symbol:"IUSQ.DE",      name:"iShares MSCI ACWI UCITS ETF",       mgr:"BlackRock",          isin:"IE00B6R52259"},
-
-  // ── 🇺🇸 Indexados USA ─────────────────────────────────────────────────────────
-  {grp:"🇺🇸 Indexados USA",     symbol:"SPY",          name:"SPDR S&P 500 ETF Trust",            mgr:"State Street",       isin:"US78462F1030"},
-  {grp:"🇺🇸 Indexados USA",     symbol:"VOO",          name:"Vanguard S&P 500 ETF",              mgr:"Vanguard",           isin:"US9229083632"},
-  {grp:"🇺🇸 Indexados USA",     symbol:"CSPX.L",       name:"iShares Core S&P 500 UCITS ETF",    mgr:"BlackRock",          isin:"IE00B5BMR087"},
-  {grp:"🇺🇸 Indexados USA",     symbol:"QQQ",          name:"Invesco QQQ (NASDAQ-100)",          mgr:"Invesco",            isin:"US46090E1038"},
-  {grp:"🇺🇸 Indexados USA",     symbol:"VUSA.L",       name:"Vanguard S&P 500 UCITS ETF",        mgr:"Vanguard",           isin:"IE00B3XXRP09"},
-
-  // ── 🌍 Indexados Europa ───────────────────────────────────────────────────────
-  {grp:"🌍 Indexados Europa",   symbol:"EXW1.DE",      name:"iShares Core MSCI Europe UCITS ETF",mgr:"BlackRock",          isin:"IE00B4K48X80"},
-  {grp:"🌍 Indexados Europa",   symbol:"MEUD.PA",      name:"Amundi MSCI Europe UCITS ETF",      mgr:"Amundi",             isin:"FR0010261198"},
-  {grp:"🌍 Indexados Europa",   symbol:"EZU",          name:"iShares MSCI Eurozone ETF",         mgr:"BlackRock",          isin:"US4642864007"},
-
-  // ── 🌏 Emergentes ─────────────────────────────────────────────────────────────
-  {grp:"🌏 Emergentes",         symbol:"EEM",          name:"iShares MSCI Emerging Markets ETF", mgr:"BlackRock",          isin:"US4642872349"},
-  {grp:"🌏 Emergentes",         symbol:"VWO",          name:"Vanguard FTSE Emerging Markets ETF",mgr:"Vanguard",           isin:"US9220428588"},
-  {grp:"🌏 Emergentes",         symbol:"EIMI.L",       name:"iShares Core MSCI EM IMI UCITS ETF",mgr:"BlackRock",          isin:"IE00BKM4GZ66"},
-
-  // ── 🔬 Sectoriales ────────────────────────────────────────────────────────────
-  {grp:"🔬 Sectoriales",        symbol:"XLK",          name:"Technology Select Sector SPDR",     mgr:"State Street",       isin:"US81369Y8030"},
-  {grp:"🔬 Sectoriales",        symbol:"IUIT.L",       name:"iShares S&P 500 Info Tech UCITS",   mgr:"BlackRock",          isin:"IE00B3WJKG14"},
-  {grp:"🔬 Sectoriales",        symbol:"XLV",          name:"Health Care Select Sector SPDR",    mgr:"State Street",       isin:"US81369Y4065"},
-  {grp:"🔬 Sectoriales",        symbol:"ICLN",         name:"iShares Global Clean Energy ETF",   mgr:"BlackRock",          isin:"US4642884807"},
-  {grp:"🔬 Sectoriales",        symbol:"XLF",          name:"Financial Select Sector SPDR",      mgr:"State Street",       isin:"US81369Y1082"},
-  {grp:"🔬 Sectoriales",        symbol:"XLE",          name:"Energy Select Sector SPDR",         mgr:"State Street",       isin:"US81369Y5054"},
-
-  // ── 🏦 Renta Fija ─────────────────────────────────────────────────────────────
-  {grp:"🏦 Renta Fija",         symbol:"AGG",          name:"iShares Core US Aggregate Bond ETF",mgr:"BlackRock",          isin:"US4642872422"},
-  {grp:"🏦 Renta Fija",         symbol:"TLT",          name:"iShares 20+ Year Treasury Bond ETF",mgr:"BlackRock",          isin:"US4642874329"},
-  {grp:"🏦 Renta Fija",         symbol:"AGGH.L",       name:"iShares Core Global Agg Bond UCITS",mgr:"BlackRock",          isin:"IE00BDBRDM35"},
-  {grp:"🏦 Renta Fija",         symbol:"HYG",          name:"iShares iBoxx High Yield Corp ETF", mgr:"BlackRock",          isin:"US4642885135"},
-  {grp:"🏦 Renta Fija",         symbol:"EMB",          name:"iShares JP Morgan EM Bond ETF",     mgr:"BlackRock",          isin:"US4642882819"},
-
-  // ── 📦 ETFs Cotizados Mixtos ──────────────────────────────────────────────────
-  {grp:"📦 ETFs Cotizados",     symbol:"GLD",          name:"SPDR Gold Shares",                  mgr:"State Street",       isin:"US78463V1070"},
-  {grp:"📦 ETFs Cotizados",     symbol:"VHYL.L",       name:"Vanguard FTSE All-World High Div.", mgr:"Vanguard",           isin:"IE00B8GKDB10"},
-  {grp:"📦 ETFs Cotizados",     symbol:"EQQQ.L",       name:"Invesco NASDAQ-100 UCITS ETF",      mgr:"Invesco",            isin:"IE0032077012"},
-  {grp:"📦 ETFs Cotizados",     symbol:"WSML.L",       name:"iShares MSCI World Small Cap UCITS",mgr:"BlackRock",          isin:"IE00BF4RFH31"},
-  {grp:"📦 ETFs Cotizados",     symbol:"ZPRV.DE",      name:"SPDR MSCI USA Small Cap Value ETF", mgr:"State Street",       isin:"IE00BSPLC413"},
-];
-
-// Agrupar por grp
-const GROUPS = [...new Set(CATALOG.map(f=>f.grp))];
-
-// ── SPARKLINE ─────────────────────────────────────────────────────────────────
-const Spark = ({history, change}) => {
-  if(!history||history.length<2) return null;
-  const vals=history.slice(-60).map(h=>h.nav).filter(v=>v>0);
-  if(vals.length<2) return null;
-  const W=70,H=28,min=Math.min(...vals),max=Math.max(...vals),rng=max-min||1;
-  const x=i=>(i/(vals.length-1))*W;
-  const y=v=>H-((v-min)/rng)*(H-4)-2;
-  const d=vals.map((v,i)=>`${i===0?"M":"L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const color=(change||0)>=0?"#22c55e":"#ef4444";
-  return(
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:70,height:28,flexShrink:0}}>
-      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>
+// ─── Sparkline mini ───────────────────────────────────────────────────────────
+function Spark({ history, positive }) {
+  const vals = (history || []).slice(-60).map(h => h.nav).filter(Boolean);
+  if (vals.length < 2) return <div style={{ width: 80, height: 32 }} />;
+  const W = 80, H = 32, mn = Math.min(...vals), mx = Math.max(...vals), rng = mx - mn || 1;
+  const pts = vals.map((v, i) =>
+    `${(i / (vals.length - 1) * W).toFixed(1)},${(H - ((v - mn) / rng) * (H - 4) - 2).toFixed(1)}`
+  ).join(" ");
+  const c = positive === false ? "#dc2626" : "#16a34a";
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: W, height: H }}>
+      <polyline points={pts} fill="none" stroke={c} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
-};
+}
 
-// ── GRÁFICA NAV ───────────────────────────────────────────────────────────────
-const NavChart = ({history}) => {
-  const [hov,setHov] = useState(null);
-  const [w,setW]     = useState(600);
-  const ref=useRef(null), svgRef=useRef(null);
-  useEffect(()=>{
-    const obs=new ResizeObserver(e=>{const v=e[0]?.contentRect?.width; if(v)setW(Math.max(280,v));});
-    if(ref.current) obs.observe(ref.current);
-    return()=>obs.disconnect();
-  },[]);
+// ─── Gráfica histórico ────────────────────────────────────────────────────────
+function NavChart({ history }) {
+  const [hov, setHov] = useState(null);
+  const [w, setW]     = useState(600);
+  const ref    = useRef(null);
+  const gidRef = useRef("g" + Math.random().toString(36).slice(2, 8));
 
-  const pts=(history||[]).filter(h=>h.nav>0);
-  if(pts.length<2) return(
-    <div style={{height:180,display:"flex",alignItems:"center",justifyContent:"center",color:"#2d3748",fontSize:12}}>Sin histórico</div>
-  );
-  const W=w,H=200,PL=54,PR=12,PT=12,PB=26;
-  const cw=W-PL-PR,ch=H-PT-PB;
-  const vals=pts.map(p=>p.nav);
-  const minP=Math.min(...vals),maxP=Math.max(...vals);
-  const pad=(maxP-minP)*0.07||1;
-  const yMin=minP-pad,yMax=maxP+pad,yRng=yMax-yMin;
-  const xp=i=>PL+(i/(pts.length-1))*cw;
-  const yp=v=>PT+ch-((v-yMin)/yRng)*ch;
-  const pd=pts.map((p,i)=>`${i===0?"M":"L"}${xp(i).toFixed(1)},${yp(p.nav).toFixed(1)}`).join(" ");
-  const last=vals[vals.length-1],first=vals[0];
-  const isUp=last>=first; const color=isUp?"#22c55e":"#ef4444";
-  const gid=`nc${Math.random().toString(36).slice(2,6)}`;
-  const ad=`${pd} L${xp(pts.length-1).toFixed(1)},${(PT+ch).toFixed(1)} L${PL},${(PT+ch).toFixed(1)} Z`;
-  const step=Math.max(1,Math.floor(pts.length/5));
-  const xlbls=[0,1,2,3,4].map(i=>Math.min(i*step,pts.length-1));
-  const ylbls=[0,.33,.66,1].map(f=>({v:yMin+f*yRng,yp:PT+ch*(1-f)}));
-  const onMove=e=>{
-    const r=svgRef.current?.getBoundingClientRect(); if(!r)return;
-    const i=Math.round(((e.clientX-r.left-PL)/cw)*(pts.length-1));
-    if(i>=0&&i<pts.length) setHov(i);
+  useEffect(() => {
+    const ob = new ResizeObserver(([e]) => setW(e.contentRect.width || 600));
+    if (ref.current) ob.observe(ref.current);
+    return () => ob.disconnect();
+  }, []);
+
+  const pts = (history || []).filter(h => h.nav > 0);
+  const gid = gidRef.current;
+
+  if (pts.length < 2) {
+    return <div ref={ref} style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 13 }}>Sin histórico disponible</div>;
+  }
+
+  const PL = 56, PR = 16, PT = 12, PB = 28, H = 200;
+  const cw = w - PL - PR, ch = H - PT - PB;
+  const navs = pts.map(p => p.nav);
+  const mn = Math.min(...navs), mx = Math.max(...navs);
+  const pad = (mx - mn) * 0.08 || 1;
+  const yMn = mn - pad, yRng = mx + pad - yMn;
+  const xp = i => PL + (i / (pts.length - 1)) * cw;
+  const yp = v => PT + ch - ((v - yMn) / yRng) * ch;
+  const d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${xp(i).toFixed(1)},${yp(p.nav).toFixed(1)}`).join(" ");
+  const first = navs[0], last = navs.at(-1);
+  const isUp = last >= first;
+  const c = isUp ? "#16a34a" : "#dc2626";
+  const area = `${d} L${xp(pts.length - 1).toFixed(1)},${PT + ch} L${PL},${PT + ch} Z`;
+  const yLabels = [0, 0.5, 1].map(f => ({ v: yMn + f * yRng, y: PT + ch * (1 - f) }));
+  const xStep = Math.max(1, Math.floor(pts.length / 5));
+  const xLabels = [0, 1, 2, 3, 4].map(i => Math.min(i * xStep, pts.length - 1));
+  const onMove = e => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const i = Math.round(((e.clientX - r.left - PL) / cw) * (pts.length - 1));
+    setHov(Math.max(0, Math.min(pts.length - 1, i)));
   };
-  return(
-    <div ref={ref}>
-      <div style={{height:26,padding:"4px 10px",background:"#0d1520",borderBottom:"1px solid #1a2535",
-        display:"flex",gap:14,alignItems:"center",...MONO,fontSize:11}}>
-        {hov!=null?(
+
+  return (
+    <div ref={ref} onMouseMove={onMove} onMouseLeave={() => setHov(null)}>
+      <div style={{ height: 28, display: "flex", alignItems: "center", gap: 16, padding: "0 4px", ...MONO, fontSize: 12 }}>
+        {hov != null ? (
           <>
-            <span style={{color:"#4a5568"}}>{new Date((pts[hov].date||0)*1000).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"2-digit"})}</span>
-            <span style={{color:"#f1f5f9",fontWeight:600}}>{fmt(pts[hov].nav,4)}</span>
-            <span style={{color:(pts[hov].nav>=first)?"#22c55e":"#ef4444"}}>
-              {fmtPct(((pts[hov].nav-first)/first)*100)}
+            <span style={{ color: "#64748b" }}>
+              {new Date(pts[hov].date * 1000).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+            </span>
+            <span style={{ color: "#1e293b", fontWeight: 700 }}>{n4(pts[hov].nav)}</span>
+            <span style={{ color: clr(((pts[hov].nav - first) / first) * 100) }}>
+              {pct(((pts[hov].nav - first) / first) * 100)} desde inicio
             </span>
           </>
-        ):<span style={{color:"#2d3748"}}>Mueve el cursor sobre el gráfico</span>}
+        ) : (
+          <span style={{ color: "#94a3b8" }}>Rentabilidad total período: <strong style={{ color: clr(((last - first) / first) * 100) }}>{pct(((last - first) / first) * 100)}</strong></span>
+        )}
       </div>
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:H,display:"block"}}
-        onMouseMove={onMove} onMouseLeave={()=>setHov(null)}>
+      <svg viewBox={`0 0 ${w} ${H}`} style={{ width: "100%", height: H, display: "block" }}>
         <defs>
           <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity=".2"/>
-            <stop offset="100%" stopColor={color} stopOpacity=".01"/>
+            <stop offset="0%" stopColor={c} stopOpacity=".12" />
+            <stop offset="100%" stopColor={c} stopOpacity="0" />
           </linearGradient>
         </defs>
-        {ylbls.map((l,i)=><line key={i} x1={PL} x2={W-PR} y1={l.yp} y2={l.yp} stroke="#1a2535" strokeWidth={1}/>)}
-        <path d={ad} fill={`url(#${gid})`}/>
-        <path d={pd} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round"/>
-        {hov!=null&&<>
-          <line x1={xp(hov)} x2={xp(hov)} y1={PT} y2={PT+ch} stroke="#2a3a50" strokeWidth={1} strokeDasharray="3 3"/>
-          <circle cx={xp(hov)} cy={yp(pts[hov].nav)} r={3.5} fill={color} stroke="#0b0f18" strokeWidth={2}/>
-        </>}
-        {hov==null&&<circle cx={xp(pts.length-1)} cy={yp(last)} r={3} fill={color} stroke="#0b0f18" strokeWidth={2}/>}
-        {ylbls.map((l,i)=>(
-          <text key={i} x={PL-4} y={l.yp+3} textAnchor="end" fill="#334155" fontSize={9} fontFamily="'JetBrains Mono',monospace">{fmt(l.v,2)}</text>
+        {yLabels.map((l, i) => (
+          <g key={i}>
+            <line x1={PL} x2={w - PR} y1={l.y} y2={l.y} stroke="#e2e8f0" strokeWidth={1} />
+            <text x={PL - 6} y={l.y + 4} textAnchor="end" fill="#94a3b8" fontSize={10} fontFamily="monospace">{n2(l.v)}</text>
+          </g>
         ))}
-        {xlbls.map((i,k)=>(
-          <text key={k} x={xp(i)} y={H-5} textAnchor="middle" fill="#2d3748" fontSize={9} fontFamily="'JetBrains Mono',monospace">
-            {new Date((pts[i].date||0)*1000).toLocaleDateString("es-ES",{month:"short",year:"2-digit"})}
+        <path d={area} fill={`url(#${gid})`} />
+        <path d={d} fill="none" stroke={c} strokeWidth={2} strokeLinejoin="round" />
+        {hov != null ? (
+          <>
+            <line x1={xp(hov)} x2={xp(hov)} y1={PT} y2={PT + ch} stroke="#cbd5e1" strokeWidth={1} strokeDasharray="4 2" />
+            <circle cx={xp(hov)} cy={yp(pts[hov].nav)} r={4} fill={c} stroke="white" strokeWidth={2} />
+          </>
+        ) : (
+          <circle cx={xp(pts.length - 1)} cy={yp(last)} r={3.5} fill={c} stroke="white" strokeWidth={2} />
+        )}
+        {xLabels.map((i, k) => (
+          <text key={k} x={xp(i)} y={H - 6} textAnchor="middle" fill="#94a3b8" fontSize={10} fontFamily="monospace">
+            {new Date(pts[i].date * 1000).toLocaleDateString("es-ES", { month: "short", year: "2-digit" })}
           </text>
         ))}
       </svg>
     </div>
   );
-};
+}
 
-// ── PANEL DETALLE ─────────────────────────────────────────────────────────────
-const DetailPanel = ({fund, detail, loading, error, onClose}) => {
-  const isUp=(detail?.change_pct||0)>=0;
-  const color=isUp?"#22c55e":"#ef4444";
-  const rets=[
-    {l:"1 día",   v:detail?.return_1d},
-    {l:"1 sem.",  v:detail?.return_1w},
-    {l:"1 mes",   v:detail?.return_1m},
-    {l:"3 meses", v:detail?.return_3m},
-    {l:"6 meses", v:detail?.return_6m},
-    {l:"YTD",     v:detail?.return_ytd},
-    {l:"1 año",   v:detail?.return_1y},
-    {l:"3 años",  v:detail?.return_3y},
-  ];
-  return(
-    <div style={{background:"#111827",border:"1px solid #1e2a3a",borderRadius:10,overflow:"hidden",position:"sticky",top:20}}>
-      <div style={{padding:"12px 16px",borderBottom:"1px solid #1e2a3a",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9",marginBottom:4,lineHeight:1.3}}>
-            {detail?.name||fund?.name||fund?.symbol}
+// ─── Panel lateral detalle ────────────────────────────────────────────────────
+function DetailPanel({ fund, detail, loading, error, onClose }) {
+  const [tab, setTab]           = useState("resumen");
+  const [holdings, setHoldings] = useState(null);
+  const [holdLoad, setHoldLoad] = useState(false);
+  const [quotes, setQuotes]     = useState({});
+  const pollRef                 = useRef(null);
+
+  useEffect(() => { setTab("resumen"); setHoldings(null); setQuotes({}); }, [fund?.isin]);
+
+  // Función para cargar cotizaciones
+  const loadQuotes = useCallback(async (holdingsList) => {
+    const tickers = holdingsList.map(h => h.ticker).filter(Boolean);
+    if (!tickers.length) return;
+    try {
+      const r = await fetch(`${API_BASE}/stocks/quotes/batch?symbols=${tickers.join(",")}`);
+      if (r.ok) setQuotes(await r.json());
+    } catch { }
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "posiciones" || holdings || holdLoad) return;
+    setHoldLoad(true);
+    fetch(`${API_BASE}/funds/${fund.isin}/holdings`)
+      .then(r => r.ok ? r.json() : null)
+      .then(async d => {
+        setHoldings(d);
+        setHoldLoad(false);
+        if (d?.holdings?.length) {
+          // Carga inicial
+          await loadQuotes(d.holdings);
+          // Polling cada 30 segundos
+          pollRef.current = setInterval(() => loadQuotes(d.holdings), 30000);
+        }
+      })
+      .catch(() => setHoldLoad(false));
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [tab, fund?.isin, holdings, holdLoad, loadQuotes]);
+
+  // Limpiar polling al cerrar panel
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const rets = [
+    { l: "1 semana", v: detail?.return_1w },
+    { l: "1 mes",    v: detail?.return_1m },
+    { l: "3 meses",  v: detail?.return_3m },
+    { l: "6 meses",  v: detail?.return_6m },
+    { l: "YTD",      v: detail?.return_ytd },
+    { l: "1 año",    v: detail?.return_1y },
+    { l: "3 años",   v: detail?.return_3y },
+    { l: "5 años",   v: detail?.return_5y },
+  ].filter(r => r.v != null);
+
+  const navUp = (detail?.change_pct || 0) >= 0;
+
+  return (
+    <div style={{
+      background: "white", border: "1px solid #e2e8f0", borderRadius: 12,
+      overflow: "hidden", position: "sticky", top: 16,
+      maxHeight: "calc(100vh - 32px)", overflowY: "auto",
+      boxShadow: "0 4px 24px rgba(0,0,0,.08)",
+    }}>
+      {/* Header */}
+      <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", lineHeight: 1.3, marginBottom: 3 }}>
+              {detail?.name || fund?.name}
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>{detail?.mgr || fund?.mgr}</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+              {detail?.category && (
+                <span style={{ fontSize: 11, color: "#475569", background: "#e2e8f0", padding: "2px 8px", borderRadius: 20 }}>
+                  {detail.category}
+                </span>
+              )}
+              <span style={{ fontSize: 11, color: "#64748b", background: "#f1f5f9", padding: "2px 8px", borderRadius: 20, ...MONO }}>
+                {fund.isin}
+              </span>
+            </div>
           </div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-            {fund?.mgr&&<span style={{fontSize:11,color:"#4a5568"}}>{fund.mgr}</span>}
-            {detail?.currency&&<span style={{fontSize:11,color:"#334155"}}>· {detail.currency}</span>}
-          </div>
-          {fund?.isin&&<div style={{...MONO,fontSize:10,color:"#2d3748",marginTop:3}}>ISIN: {fund.isin}</div>}
-          {isCNMV(fund?.symbol)&&<div style={{fontSize:9,color:"#22c55e",background:"#22c55e15",
-            border:"1px solid #22c55e30",borderRadius:3,padding:"1px 5px",marginTop:3,
-            display:"inline-block",letterSpacing:"0.05em"}}>● CNMV oficial</div>}
+          <button onClick={onClose}
+            style={{ background: "none", border: "1px solid #e2e8f0", borderRadius: 8, width: 30, height: 30,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#94a3b8", fontSize: 16, cursor: "pointer", flexShrink: 0 }}
+            onMouseEnter={e => e.currentTarget.style.background = "#fee2e2"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}>✕</button>
         </div>
-        <button onClick={onClose}
-          style={{background:"transparent",border:"1px solid #1e2a3a",borderRadius:5,padding:"3px 8px",
-            color:"#4a5568",fontSize:12,cursor:"pointer",marginLeft:8,flexShrink:0}}
-          onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
-          onMouseLeave={e=>e.currentTarget.style.color="#4a5568"}>✕</button>
+
+        {/* NAV */}
+        {detail && !loading && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ ...MONO, fontSize: 30, fontWeight: 700, color: "#0f172a" }}>
+                {n4(detail.current_nav || detail.current_price)}
+              </span>
+              <span style={{ fontSize: 13, color: "#64748b" }}>{detail.currency}</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {detail.change_pct != null && (
+                <span style={{
+                  ...MONO, fontSize: 14, fontWeight: 600,
+                  color: navUp ? "#16a34a" : "#dc2626",
+                  background: navUp ? "#dcfce7" : "#fee2e2",
+                  padding: "3px 10px", borderRadius: 6,
+                }}>
+                  {navUp ? "▲" : "▼"} {pct(detail.change_pct)}
+                </span>
+              )}
+              {detail.nav_date && <span style={{ fontSize: 11, color: "#94a3b8" }}>a {detail.nav_date}</span>}
+            </div>
+            {detail.total_assets && (
+              <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
+                Patrimonio: <strong>{mil(detail.total_assets)}</strong>
+                {detail.ter && <span> · TER: <strong>{n2(detail.ter)}%</strong></span>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ height: 3, background: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: "45%", background: "#3b82f6", animation: "finect-slide 1s infinite" }} />
+            </div>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 8 }}>Cargando datos...</div>
+          </div>
+        )}
+        {error && !loading && <div style={{ marginTop: 8, fontSize: 12, color: "#dc2626" }}>⚠ {error}</div>}
       </div>
 
-      {loading&&(
-        <div style={{padding:30,textAlign:"center"}}>
-          <div style={{width:"80%",height:2,background:"#1e2a3a",borderRadius:1,margin:"0 auto",overflow:"hidden"}}>
-            <div style={{width:"60%",height:"100%",background:"#f59e0b",animation:"slide 1s ease-in-out infinite"}}/>
-          </div>
-          <div style={{fontSize:11,color:"#334155",marginTop:10}}>Cargando datos...</div>
-        </div>
-      )}
-
-      {error&&!loading&&(
-        <div style={{padding:20,textAlign:"center",color:"#ef4444",fontSize:12}}>{error}</div>
-      )}
-
-      {detail&&!loading&&(
+      {/* Tabs */}
+      {detail && !loading && (
         <>
-          {/* Precio / NAV */}
-          <div style={{padding:"12px 16px",borderBottom:"1px solid #1e2a3a"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-              <span style={{fontSize:10,color:"#334155",textTransform:"uppercase",letterSpacing:"0.07em"}}>NAV actual</span>
-              <span style={{...MONO,fontSize:11,color:"#2d3748"}}>{detail.currency}</span>
-            </div>
-            <div style={{...MONO,fontSize:28,color:"#f1f5f9",marginTop:2}}>{fmt(detail.current_nav,4)}</div>
-            <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
-              <span style={{...MONO,fontSize:13,color,background:`${color}18`,padding:"2px 8px",borderRadius:4}}>
-                {isUp?"▲":"▼"} {fmtPct(detail.change_pct)}
-              </span>
-              <span style={{fontSize:11,color:"#334155"}}>· Anterior: {fmt(detail.prev_nav,4)}</span>
-            </div>
-            <div style={{display:"flex",gap:14,marginTop:8}}>
-              <div><div style={{fontSize:9,color:"#2d3748"}}>MÍN 52S</div><div style={{...MONO,fontSize:11,color:"#64748b"}}>{fmt(detail["52w_low"])}</div></div>
-              <div><div style={{fontSize:9,color:"#2d3748"}}>MÁX 52S</div><div style={{...MONO,fontSize:11,color:"#64748b"}}>{fmt(detail["52w_high"])}</div></div>
-              <div><div style={{fontSize:9,color:"#2d3748"}}>DATOS</div><div style={{fontSize:10,color:"#4a5568"}}>{detail.data_points||"—"} días</div></div>
-            </div>
+          <div style={{ display: "flex", borderBottom: "1px solid #e2e8f0", background: "white" }}>
+            {[["resumen","Resumen"],["grafica","Gráfica"],["posiciones","Cartera"]].map(([id, label]) => (
+              <button key={id} onClick={() => setTab(id)} style={{
+                flex: 1, padding: "10px 4px", background: "none", border: "none",
+                borderBottom: `2px solid ${tab === id ? "#3b82f6" : "transparent"}`,
+                color: tab === id ? "#3b82f6" : "#64748b",
+                fontSize: 13, fontWeight: tab === id ? 600 : 400,
+                fontFamily: "inherit", cursor: "pointer",
+              }}>{label}</button>
+            ))}
           </div>
 
-          {/* Rentabilidades */}
-          <div style={{padding:"12px 16px",borderBottom:"1px solid #1e2a3a"}}>
-            <div style={{fontSize:10,color:"#334155",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.07em"}}>Rentabilidades</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              {rets.filter(r=>r.v!=null).map(r=>{
-                const up=r.v>=0;
-                return(
-                  <div key={r.l} style={{background:"#0b0f18",border:"1px solid #1e2a3a",borderRadius:6,padding:"7px 10px",
-                    display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span style={{fontSize:10,color:"#4a5568"}}>{r.l}</span>
-                    <span style={{...MONO,fontSize:12,color:up?"#22c55e":"#ef4444"}}>{fmtPct(r.v)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Gráfica NAV */}
-          {detail.history&&detail.history.length>5&&(
-            <div style={{borderBottom:"1px solid #1e2a3a"}}>
-              <div style={{padding:"8px 16px",fontSize:10,color:"#334155",textTransform:"uppercase",letterSpacing:"0.07em"}}>Evolución NAV</div>
-              <NavChart history={detail.history}/>
+          {/* Resumen */}
+          {tab === "resumen" && (
+            <div style={{ padding: "16px 20px" }}>
+              {rets.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>Rentabilidades</div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 16 }}>
+                    <tbody>
+                      {rets.map(r => (
+                        <tr key={r.l} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "7px 0", fontSize: 13, color: "#475569" }}>{r.l}</td>
+                          <td style={{ padding: "7px 0", textAlign: "right", ...MONO, fontSize: 13, fontWeight: 600, color: clr(r.v) }}>{pct(r.v)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>Información</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <tbody>
+                  {[
+                    ["Gestora", detail.mgr],
+                    ["Divisa",  detail.currency],
+                    ["TER",     detail.ter ? `${n2(detail.ter)}%` : null],
+                    ["Patrimonio", detail.total_assets ? mil(detail.total_assets) : null],
+                    ["Fuente",  detail.source === "morningstar" ? "Morningstar" : detail.source === "cnmv" ? "CNMV" : "Yahoo Finance"],
+                  ].filter(([,v]) => v).map(([l, v]) => (
+                    <tr key={l} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "7px 0", fontSize: 13, color: "#475569" }}>{l}</td>
+                      <td style={{ padding: "7px 0", textAlign: "right", fontSize: 13, color: "#1e293b", fontWeight: 500 }}>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
-          <div style={{padding:"8px 14px",fontSize:10,color:"#2d3748",textAlign:"center"}}>
-            {isCNMV(fund?.symbol)?"Datos: CNMV (oficial) · VL publicado cada día hábil":"Datos: Yahoo Finance · actualizado 1 vez al día"}
-          </div>
+          {/* Gráfica */}
+          {tab === "grafica" && (
+            <div style={{ padding: "12px 8px 8px" }}>
+              <NavChart history={detail.history} />
+            </div>
+          )}
+
+          {/* Posiciones */}
+          {tab === "posiciones" && (
+            <div style={{ padding: "16px 20px" }}>
+              {holdLoad && (
+                <div style={{ textAlign: "center", color: "#94a3b8", fontSize: 13, padding: 30 }}>
+                  Cargando cartera...
+                </div>
+              )}
+              {!holdLoad && holdings?.holdings?.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
+                    Principales posiciones · {holdings.holdings.length} empresas
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                        <th style={{ padding: "6px 0", fontSize: 11, color: "#94a3b8", textAlign: "left", fontWeight: 600 }}>Empresa</th>
+                        <th style={{ padding: "6px 0", fontSize: 11, color: "#94a3b8", textAlign: "right", fontWeight: 600 }}>Cotización</th>
+                        <th style={{ padding: "6px 0", fontSize: 11, color: "#94a3b8", textAlign: "right", fontWeight: 600 }}>Hoy</th>
+                        <th style={{ padding: "6px 0", fontSize: 11, color: "#94a3b8", textAlign: "right", fontWeight: 600 }}>Peso</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {holdings.holdings.map((h, i) => {
+                        const q = quotes[h.ticker];
+                        const qUp = q ? q.change_pct >= 0 : null;
+                        return (
+                          <tr key={i} style={{ borderBottom: "1px solid #f8fafc" }}>
+                            <td style={{ padding: "8px 0" }}>
+                              <div style={{ fontSize: 13, color: "#1e293b", fontWeight: 500 }}>{h.name}</div>
+                              <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+                                {h.ticker && <span style={{ ...MONO, fontSize: 10, color: "#3b82f6" }}>{h.ticker}</span>}
+                                {h.country && <span style={{ fontSize: 10, color: "#cbd5e1" }}>{h.country}</span>}
+                              </div>
+                              <div style={{ marginTop: 4, height: 2, background: "#f1f5f9", borderRadius: 2 }}>
+                                <div style={{ height: "100%", width: `${Math.min(h.weight * 6, 100)}%`, background: "#3b82f6", borderRadius: 2 }} />
+                              </div>
+                            </td>
+                            <td style={{ padding: "8px 0 8px 8px", textAlign: "right", ...MONO, fontSize: 12, color: "#1e293b", verticalAlign: "top" }}>
+                              {q ? `${n2(q.price)} ${q.currency || ""}` : "—"}
+                            </td>
+                            <td style={{ padding: "8px 0 8px 8px", textAlign: "right", ...MONO, fontSize: 12, fontWeight: 600,
+                              color: qUp === null ? "#94a3b8" : qUp ? "#16a34a" : "#dc2626", verticalAlign: "top" }}>
+                              {q ? pct(q.change_pct) : "—"}
+                            </td>
+                            <td style={{ padding: "8px 0 8px 8px", textAlign: "right", ...MONO, fontSize: 13, fontWeight: 700, color: "#1e293b", verticalAlign: "top" }}>
+                              {n2(h.weight)}%
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{ marginTop: 10, fontSize: 11, color: "#94a3b8", textAlign: "right" }}>
+                    Posiciones: Morningstar · Cotizaciones: Yahoo Finance (tiempo real)
+                  </div>
+                </>
+              )}
+              {!holdLoad && !holdings?.holdings?.length && (
+                <div style={{ textAlign: "center", padding: 30 }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+                  <div style={{ fontSize: 13, color: "#64748b" }}>Posiciones no disponibles</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                    Ejecuta el scraper para activar este dato
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
   );
-};
+}
 
-// ── TARJETA FONDO ─────────────────────────────────────────────────────────────
-const FundCard = ({fund, detail, loading, isSelected, onClick}) => {
-  const isUp=(detail?.change_pct||0)>=0;
-  const color=isUp?"#22c55e":"#ef4444";
-  return(
-    <div onClick={onClick}
-      style={{background:isSelected?"#141e2e":"#111827",border:`1px solid ${isSelected?"#2a4070":"#1e2a3a"}`,
-        borderRadius:8,padding:"11px 14px",cursor:"pointer",transition:"all .1s"}}
-      onMouseEnter={e=>{if(!isSelected){e.currentTarget.style.background="#141e2e";e.currentTarget.style.borderColor="#2a3a50";}}}
-      onMouseLeave={e=>{if(!isSelected){e.currentTarget.style.background="#111827";e.currentTarget.style.borderColor="#1e2a3a";}}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:12,color:"#e2e8f0",fontWeight:500,lineHeight:1.3,marginBottom:3,
-            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {fund.name}
-          </div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            <span style={{fontSize:10,color:"#4a5568"}}>{fund.mgr}</span>
-            {fund.isin&&<span style={{...MONO,fontSize:9,color:"#2d3748"}}>{fund.isin}</span>}
-          </div>
-        </div>
-        <div style={{textAlign:"right",flexShrink:0}}>
-          {loading?(
-            <div style={{width:60,height:10,background:"#1e2a3a",borderRadius:2,animation:"pulse 1.5s ease-in-out infinite"}}/>
-          ):detail?(
-            <>
-              <div style={{...MONO,fontSize:13,color:"#f1f5f9"}}>{fmt(detail.current_nav,4)}</div>
-              <div style={{...MONO,fontSize:11,color,marginTop:2}}>{fmtPct(detail.change_pct)}</div>
-            </>
-          ):<div style={{fontSize:10,color:"#2d3748"}}>—</div>}
-        </div>
-      </div>
-      {detail&&(
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
-          <div style={{display:"flex",gap:12}}>
-            {[{l:"1M",v:detail.return_1m},{l:"6M",v:detail.return_6m},{l:"1A",v:detail.return_1y}].map(r=>(
-              r.v!=null&&<div key={r.l} style={{fontSize:9}}>
-                <span style={{color:"#2d3748"}}>{r.l}: </span>
-                <span style={{...MONO,color:(r.v>=0)?"#22c55e":"#ef4444"}}>{fmtPct(r.v)}</span>
-              </div>
-            ))}
-          </div>
-          <Spark history={detail.history} change={detail.change_pct}/>
-        </div>
-      )}
-    </div>
-  );
-};
 
-// ── BUSCADOR ──────────────────────────────────────────────────────────────────
-const SearchInput = ({onSelect}) => {
-  const [q,setQ]       = useState("");
-  const [res,setRes]   = useState([]);
-  const [loading,setL] = useState(false);
-  const [open,setOpen] = useState(false);
-  const ref            = useRef(null);
-
-  useEffect(()=>{
-    const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
-    document.addEventListener("mousedown",h);
-    return()=>document.removeEventListener("mousedown",h);
-  },[]);
-
-  useEffect(()=>{
-    if(!q.trim()){setRes([]);setOpen(false);return;}
-    const t=setTimeout(async()=>{
-      setL(true);
-      try{
-        const r=await fetch(`${API_BASE}/funds/search?q=${encodeURIComponent(q)}`);
-        if(r.ok){const d=await r.json();setRes(d||[]);setOpen((d||[]).length>0);}
-      }catch{}
-      setL(false);
-    },400);
-    return()=>clearTimeout(t);
-  },[q]);
-
-  const pick=item=>{setQ("");setRes([]);setOpen(false);onSelect(item);};
-
-  return(
-    <div ref={ref} style={{position:"relative",flex:1,maxWidth:500}}>
-      <div style={{display:"flex",alignItems:"center",background:"#0b0f18",
-        border:`1px solid ${open?"#2a4070":"#1e2a3a"}`,borderRadius:8}}>
-        <span style={{padding:"0 12px",color:"#334155",fontSize:15}}>⌕</span>
-        <input value={q} onChange={e=>setQ(e.target.value)} onFocus={()=>res.length>0&&setOpen(true)}
-          placeholder='Busca fondo por nombre o ISIN, ej: "Cobas", "Vanguard", "IE00B4L5Y983"'
-          style={{flex:1,background:"transparent",border:"none",outline:"none",padding:"9px 0",
-            color:"#e2e8f0",fontSize:13,fontFamily:"inherit"}}/>
-        {loading&&<span style={{padding:"0 12px",color:"#334155",fontSize:11}}>···</span>}
-        {q&&!loading&&<button onClick={()=>{setQ("");setRes([]);setOpen(false);}}
-          style={{padding:"0 12px",background:"transparent",border:"none",color:"#334155",fontSize:14,cursor:"pointer"}}>✕</button>}
-      </div>
-      {open&&res.length>0&&(
-        <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:"#111827",
-          border:"1px solid #2a3a50",borderRadius:8,boxShadow:"0 8px 32px rgba(0,0,0,.7)",
-          zIndex:300,maxHeight:360,overflowY:"auto"}}>
-          {res.map((r,i)=>(
-            <div key={i} onClick={()=>pick(r)}
-              style={{padding:"9px 14px",cursor:"pointer",borderBottom:i<res.length-1?"1px solid #1a2535":"none"}}
-              onMouseEnter={e=>e.currentTarget.style.background="#141e2e"}
-              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <div style={{...MONO,fontSize:12,color:"#f59e0b"}}>{r.symbol}</div>
-              <div style={{fontSize:12,color:"#94a3b8",marginTop:1}}>{r.name}</div>
-              {r.isin&&<div style={{...MONO,fontSize:10,color:"#2d3748",marginTop:1}}>{r.isin}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── FUNDS PRINCIPAL ───────────────────────────────────────────────────────────
+// ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function Funds() {
-  const [details,setDetails]   = useState({});
-  const [loading,setLoading]   = useState({});
-  const [errors,setErrors]     = useState({});
-  const [selected,setSelected] = useState(null);
-  const [activeGrp,setActiveGrp] = useState("Todos");
-  const [filter,setFilter]     = useState("");
-  const [extra,setExtra]       = useState([]);
-  const [remoteCatalog,setRemoteCatalog] = useState([]);
+  const [catalog, setCatalog]     = useState([]);
+  const [details, setDetails]     = useState({});
+  const [loading, setLoading]     = useState({});
+  const [errors, setErrors]       = useState({});
+  const [selected, setSelected]   = useState(null);
+  const [activeGrp, setActiveGrp] = useState("Todos");
+  const [filter, setFilter]       = useState("");
   const loaded = useRef(new Set());
 
-  const loadDetail = useCallback(async sym => {
-    if(!sym||loaded.current.has(sym)) return;
-    loaded.current.add(sym);
-    setLoading(p=>({...p,[sym]:true}));
-    try{
-      const r=await fetch(`${API_BASE}/funds/${sym}/detail`);
-      if(r.ok){ const d=await r.json(); setDetails(p=>({...p,[sym]:d})); }
-      else setErrors(p=>({...p,[sym]:"Sin datos"}));
-    }catch{setErrors(p=>({...p,[sym]:"Error de conexión"}));}
-    setLoading(p=>({...p,[sym]:false}));
-  },[]);
+  // Cargar catálogo dinámico del backend
+  useEffect(() => {
+    fetch(`${API_BASE}/funds/catalog`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setCatalog(Array.isArray(d) ? d : []))
+      .catch(() => setCatalog([]));
+  }, []);
 
-  // Cargar todos en grupos de 3 con delay para no saturar
-  useEffect(()=>{
-    const load=async()=>{
-      const mergedSyms = [];
-      const seen = new Set();
-      [...extra.map(f=>f.symbol), ...CATALOG.map(f=>f.symbol), ...remoteCatalog.map(f=>f.symbol)].forEach(sym => {
-        const key = (sym || "").toUpperCase();
-        if(!key || seen.has(key)) return;
-        seen.add(key);
-        mergedSyms.push(sym);
-      });
-      const syms=mergedSyms;
-      for(let i=0;i<syms.length;i++){
-        loadDetail(syms[i]);
-        if(i%3===2) await new Promise(r=>setTimeout(r,150));
+  const GROUPS = useMemo(() => ["Todos", ...new Set(catalog.map(f => f.grp))], [catalog]);
+
+  const loadDetail = useCallback(async (isin) => {
+    if (loaded.current.has(isin)) return;
+    loaded.current.add(isin);
+    setLoading(p => ({ ...p, [isin]: true }));
+    try {
+      const r = await fetch(`${API_BASE}/funds/${isin}/detail`);
+      if (r.ok) {
+        const d = await r.json();
+        if (d.detail) throw new Error(d.detail);
+        setDetails(p => ({ ...p, [isin]: d }));
+      } else {
+        setErrors(p => ({ ...p, [isin]: `Error ${r.status}` }));
+      }
+    } catch (e) {
+      setErrors(p => ({ ...p, [isin]: e.message }));
+    }
+    setLoading(p => ({ ...p, [isin]: false }));
+  }, []);
+
+  useEffect(() => {
+    if (!catalog.length) return;
+    const run = async () => {
+      for (let i = 0; i < catalog.length; i++) {
+        loadDetail(catalog[i].isin);
+        if (i % 6 === 5) await new Promise(r => setTimeout(r, 200));
       }
     };
-    load();
-  },[extra, remoteCatalog, loadDetail]);
+    run();
+  }, [catalog, loadDetail]);
 
-  useEffect(()=>{if(selected)loadDetail(selected);},[selected, loadDetail]);
+  useEffect(() => { if (selected) loadDetail(selected); }, [selected, loadDetail]);
 
-  useEffect(()=>{
-    let alive = true;
-    const loadCatalog = async () => {
-      try{
-        const r = await fetch(`${API_BASE}/funds/cnmv/catalog`);
-        if(!r.ok) return;
-        const data = await r.json();
-        if(!alive || !Array.isArray(data)) return;
-        setRemoteCatalog(data);
-      }catch{}
-    };
-    loadCatalog();
-    return()=>{ alive = false; };
-  },[]);
-
-  const handleSearchSelect = item => {
-    if(!item.symbol) return;
-    if(!CATALOG.find(f=>f.symbol===item.symbol)&&!extra.find(f=>f.symbol===item.symbol)){
-      setExtra(prev=>[{symbol:item.symbol,name:item.name||item.symbol,mgr:item.exchange||"",isin:item.isin||"",grp:"🔍 Encontrados"},...prev]);
-    }
-    setSelected(item.symbol);
-  };
-
-  const allFunds = useMemo(()=>{
-    const merged = [];
-    const seen = new Set();
-    const pushFund = fund => {
-      const key = (fund.isin || fund.symbol || fund.name || "").toUpperCase();
-      if(!key || seen.has(key)) return;
-      seen.add(key);
-      merged.push(fund);
-    };
-
-    extra.map(f=>({...f,grp:"🔍 Encontrados"})).forEach(pushFund);
-    CATALOG.forEach(pushFund);
-    remoteCatalog.forEach(pushFund);
-    return merged;
-  },[extra, remoteCatalog]);
-
-  const grps = useMemo(()=>{
-    const dynamicGroups = [...new Set(allFunds.map(f=>f.grp).filter(Boolean))];
-    const preferred = ["Todos","🔍 Encontrados",...GROUPS];
-    const gs = [...new Set([...preferred, ...dynamicGroups])];
-    return gs.filter(g=>g==="Todos"||g==="🔍 Encontrados"?extra.length>0||g==="Todos":allFunds.some(f=>f.grp===g));
-  },[extra, allFunds]);
-
-  const filtered = useMemo(()=>{
-    let list=allFunds;
-    if(activeGrp!=="Todos") list=list.filter(f=>f.grp===activeGrp);
-    if(filter.trim()){
-      const fl=filter.toLowerCase();
-      list=list.filter(f=>f.name.toLowerCase().includes(fl)||f.symbol.toLowerCase().includes(fl)||(f.mgr||"").toLowerCase().includes(fl)||(f.isin||"").toLowerCase().includes(fl));
+  const filtered = useMemo(() => {
+    let list = catalog;
+    if (activeGrp !== "Todos") list = list.filter(f => f.grp === activeGrp);
+    if (filter.trim()) {
+      const fl = filter.toLowerCase();
+      list = list.filter(f =>
+        f.name.toLowerCase().includes(fl) ||
+        f.isin.toLowerCase().includes(fl) ||
+        f.mgr.toLowerCase().includes(fl) ||
+        (details[f.isin]?.name || "").toLowerCase().includes(fl)
+      );
     }
     return list;
-  },[allFunds,activeGrp,filter]);
+  }, [catalog, activeGrp, filter, details]);
 
-  const selectedFund = allFunds.find(f=>f.symbol===selected)||{symbol:selected,name:selected,mgr:"",isin:""};
-  const loadedCount  = Object.keys(details).length;
-  const totalCount   = allFunds.length;
+  const grouped = useMemo(() => {
+    if (activeGrp !== "Todos") return [{ grp: activeGrp, funds: filtered }];
+    return [...new Set(filtered.map(f => f.grp))].map(g => ({
+      grp: g, funds: filtered.filter(f => f.grp === g)
+    }));
+  }, [filtered, activeGrp]);
 
-  return(
-    <div style={{background:"#0b0f18",minHeight:"100vh",color:"#e2e8f0",fontFamily:"'DM Sans',sans-serif"}}>
+  const loadedCount = Object.values(details).filter(d => d?.current_nav || d?.current_price).length;
+  const selectedFund = catalog.find(f => f.isin === selected) || { isin: selected, name: selected, mgr: "" };
+
+  return (
+    <div style={{ background: "#f8fafc", minHeight: "100vh", fontFamily: "'Inter','Segoe UI',sans-serif" }}>
       <style>{`
-        @keyframes pulse{0%,100%{opacity:.4}50%{opacity:.8}}
-        @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
-        ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:#0b0f18}
-        ::-webkit-scrollbar-thumb{background:#1e2a3a;border-radius:3px}
+        @keyframes finect-pulse { 0%,100%{opacity:.3} 50%{opacity:.9} }
+        @keyframes finect-slide { 0%{transform:translateX(-100%)} 100%{transform:translateX(250%)} }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 6px }
+        ::-webkit-scrollbar-track { background: #f1f5f9 }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px }
       `}</style>
-      <div style={{maxWidth:1440,margin:"0 auto",padding:"20px 24px"}}>
+
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 20px" }}>
 
         {/* HEADER */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:16,flexWrap:"wrap",gap:10}}>
-          <div>
-            <div style={{fontSize:20,fontWeight:700,color:"#f1f5f9"}}>Fondos de Inversión</div>
-            <div style={{fontSize:11,color:"#4a5568",marginTop:2}}>
-              {totalCount} fondos y ETFs · {loadedCount} con datos cargados · NAV actualizado diariamente
-            </div>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 700, color: "#0f172a" }}>
+            Fondos de Inversión
+          </h1>
+          <div style={{ fontSize: 13, color: "#64748b" }}>
+            {catalog.length} fondos y ETFs · <span style={{ color: "#16a34a", fontWeight: 500 }}>{loadedCount} con datos</span> · Datos vía Morningstar y CNMV
           </div>
-          {loadedCount>0&&(
-            <div style={{...MONO,fontSize:11,color:"#334155"}}>
-              {loadedCount}/{totalCount} cargados
-              <div style={{width:120,height:2,background:"#1e2a3a",borderRadius:1,marginTop:4,overflow:"hidden"}}>
-                <div style={{width:`${(loadedCount/totalCount)*100}%`,height:"100%",background:"#f59e0b",borderRadius:1,transition:"width .4s"}}/>
-              </div>
+        </div>
+
+        {/* FILTROS */}
+        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px", marginBottom: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+          {/* Buscador */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 200,
+            background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "7px 12px" }}>
+            <span style={{ color: "#94a3b8", fontSize: 15 }}>🔍</span>
+            <input value={filter} onChange={e => setFilter(e.target.value)}
+              placeholder="Buscar fondo, gestora o ISIN…"
+              style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "#1e293b", fontFamily: "inherit" }} />
+            {filter && <button onClick={() => setFilter("")}
+              style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 14 }}>✕</button>}
+          </div>
+
+          {/* Categorías */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {GROUPS.map(g => {
+              const cnt = g === "Todos" ? catalog.length : catalog.filter(f => f.grp === g).length;
+              const active = activeGrp === g;
+              return (
+                <button key={g} onClick={() => setActiveGrp(g)} style={{
+                  padding: "6px 14px", borderRadius: 20,
+                  border: `1px solid ${active ? "#3b82f6" : "#e2e8f0"}`,
+                  background: active ? "#eff6ff" : "white",
+                  color: active ? "#3b82f6" : "#475569",
+                  fontSize: 12, fontWeight: active ? 600 : 400,
+                  fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap",
+                }}>
+                  {g} <span style={{ opacity: .6, fontSize: 11 }}>{cnt}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* LAYOUT PRINCIPAL */}
+        <div style={{ display: "grid", gridTemplateColumns: selected ? "1fr 400px" : "1fr", gap: 16, alignItems: "start" }}>
+
+          {/* TABLA */}
+          <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,.04)" }}>
+
+            {/* Cabecera tabla */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 88px 70px 70px 70px 70px 84px 12px",
+              padding: "10px 16px", borderBottom: "2px solid #e2e8f0", gap: 8, background: "#f8fafc" }}>
+              {["Fondo / Gestora","NAV","Hoy","1 Mes","1 Año","3 Años","Evolución",""].map((h, i) => (
+                <div key={i} style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8",
+                  textTransform: "uppercase", letterSpacing: ".06em", textAlign: i === 0 ? "left" : "right" }}>{h}</div>
+              ))}
             </div>
-          )}
-        </div>
 
-        {/* BUSCADOR */}
-        <div style={{background:"#111827",border:"1px solid #1e2a3a",borderRadius:10,padding:"12px 16px",marginBottom:14}}>
-          <div style={{fontSize:10,color:"#334155",marginBottom:7,textTransform:"uppercase",letterSpacing:"0.07em"}}>Añadir fondo por nombre o ISIN</div>
-          <SearchInput onSelect={handleSearchSelect}/>
-        </div>
-
-        {/* TABS DE GRUPOS */}
-        <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
-          {grps.filter(g=>g!=="Todos").map(g=>(
-            <button key={g} onClick={()=>setActiveGrp(g)}
-              style={{padding:"5px 12px",border:"1px solid #1e2a3a",borderRadius:5,
-                background:activeGrp===g?"#1e3050":"transparent",
-                color:activeGrp===g?"#e2e8f0":"#4a5568",
-                fontSize:11,fontFamily:"inherit",cursor:"pointer"}}>
-              {g}
-              <span style={{...MONO,fontSize:9,color:"#334155",marginLeft:5}}>
-                {allFunds.filter(f=>f.grp===g).length}
-              </span>
-            </button>
-          ))}
-          <button onClick={()=>setActiveGrp("Todos")}
-            style={{padding:"5px 12px",border:"1px solid #1e2a3a",borderRadius:5,
-              background:activeGrp==="Todos"?"#1e3050":"transparent",
-              color:activeGrp==="Todos"?"#e2e8f0":"#4a5568",
-              fontSize:11,fontFamily:"inherit",cursor:"pointer"}}>
-            Todos <span style={{...MONO,fontSize:9,color:"#334155",marginLeft:5}}>{allFunds.length}</span>
-          </button>
-        </div>
-
-        {/* FILTRO TEXTO */}
-        <div style={{display:"flex",alignItems:"center",background:"#0b0f18",border:"1px solid #1e2a3a",
-          borderRadius:6,padding:"5px 12px",marginBottom:12,maxWidth:380,gap:6}}>
-          <span style={{color:"#334155",fontSize:12}}>🔍</span>
-          <input value={filter} onChange={e=>setFilter(e.target.value)}
-            placeholder="Filtrar fondos en esta vista…"
-            style={{background:"transparent",border:"none",outline:"none",color:"#e2e8f0",fontSize:12,fontFamily:"inherit",flex:1}}/>
-          {filter&&<button onClick={()=>setFilter("")}
-            style={{background:"transparent",border:"none",color:"#334155",cursor:"pointer",fontSize:12}}>✕</button>}
-        </div>
-
-        {/* LAYOUT */}
-        <div style={{display:"grid",gridTemplateColumns:selected?"1fr 400px":"1fr",gap:16,alignItems:"start"}}>
-
-          {/* LISTA */}
-          <div>
-            {/* Tabla cabecera */}
-            <div style={{background:"#111827",border:"1px solid #1e2a3a",borderRadius:10,overflow:"hidden"}}>
-              {/* Header tabla */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 70px 70px 70px 70px 80px 70px",
-                padding:"8px 14px",borderBottom:"1px solid #1e2a3a",gap:8}}>
-                {["Fondo / Gestora","NAV","Hoy","1 Mes","6 Meses","1 Año",""].map((h,i)=>(
-                  <div key={i} style={{fontSize:9,fontWeight:600,color:"#334155",textTransform:"uppercase",
-                    letterSpacing:"0.07em",textAlign:i===0?"left":"right"}}>{h}</div>
-                ))}
-              </div>
-
-              {/* Filas */}
-              {filtered.length===0?(
-                <div style={{padding:40,textAlign:"center",color:"#334155",fontSize:13}}>Sin fondos para "{filter}"</div>
-              ):(
-                <div style={{maxHeight:"70vh",overflowY:"auto"}}>
-                  {/* Agrupar por grp si está en "Todos" */}
-                  {(activeGrp==="Todos"?grps.filter(g=>g!=="Todos"&&g!=="🔍 Encontrados" ? filtered.some(f=>f.grp===g) : filtered.some(f=>f.grp===g)):["_"])
-                    .map(grpLabel=>{
-                      const grpFunds=activeGrp==="Todos"?filtered.filter(f=>f.grp===grpLabel):filtered;
-                      if(grpFunds.length===0)return null;
-                      return(
-                        <div key={grpLabel}>
-                          {activeGrp==="Todos"&&(
-                            <div style={{padding:"6px 14px",background:"#0d1520",borderBottom:"1px solid #1a2535",
-                              fontSize:10,fontWeight:600,color:"#4a5568",letterSpacing:"0.06em"}}>
-                              {grpLabel}
-                            </div>
-                          )}
-                          {grpFunds.map(f=>{
-                            const d=details[f.symbol];
-                            const l=loading[f.symbol];
-                            const isUp=(d?.change_pct||0)>=0;
-                            const c=isUp?"#22c55e":"#ef4444";
-                            const isSel=selected===f.symbol;
-                            return(
-                              <div key={f.symbol}
-                                style={{display:"grid",gridTemplateColumns:"1fr 70px 70px 70px 70px 80px 70px",
-                                  padding:"10px 14px",borderBottom:"1px solid #111827",gap:8,alignItems:"center",
-                                  cursor:"pointer",background:isSel?"#141e2e":"transparent"}}
-                                onClick={()=>setSelected(isSel?null:f.symbol)}
-                                onMouseEnter={e=>{if(!isSel)e.currentTarget.style.background="#141e2e";}}
-                                onMouseLeave={e=>{if(!isSel)e.currentTarget.style.background="transparent";}}>
-                                <div style={{minWidth:0}}>
-                                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:500,overflow:"hidden",
-                                    textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.name}</div>
-                                  <div style={{display:"flex",gap:8,marginTop:2,alignItems:"center"}}>
-                                    <span style={{fontSize:10,color:"#4a5568"}}>{f.mgr}</span>
-                                    {f.isin&&<span style={{...MONO,fontSize:9,color:"#2d3748"}}>{f.isin.slice(0,12)}</span>}
-                                  </div>
-                                </div>
-                                {l?(
-                                  <div style={{height:10,background:"#1e2a3a",borderRadius:2,animation:"pulse 1.5s ease-in-out infinite",gridColumn:"2/7"}}/>
-                                ):d?(
-                                  <>
-                                    <div style={{...MONO,fontSize:12,color:"#e2e8f0",textAlign:"right"}}>{fmt(d.current_nav||d.current_price,4)}</div>
-                                    <div style={{...MONO,fontSize:11,color:c,textAlign:"right"}}>{fmtPct(d.change_pct)}</div>
-                                    <div style={{...MONO,fontSize:11,color:(d.return_1m||0)>=0?"#22c55e":"#ef4444",textAlign:"right"}}>{fmtPct(d.return_1m)}</div>
-                                    <div style={{...MONO,fontSize:11,color:(d.return_6m||0)>=0?"#22c55e":"#ef4444",textAlign:"right"}}>{fmtPct(d.return_6m)}</div>
-                                    <div style={{...MONO,fontSize:11,color:(d.return_1y||0)>=0?"#22c55e":"#ef4444",textAlign:"right"}}>{fmtPct(d.return_1y)}</div>
-                                  </>
-                                ):(
-                                  <div style={{fontSize:10,color:"#2d3748",textAlign:"right",gridColumn:"2/7"}}>Sin datos</div>
-                                )}
-                                <div style={{display:"flex",justifyContent:"flex-end"}}>
-                                  <button onClick={e=>{e.stopPropagation();setSelected(isSel?null:f.symbol);}}
-                                    style={{background:"none",border:"1px solid #1e2a3a",borderRadius:4,padding:"2px 7px",
-                                      color:isSel?"#f59e0b":"#4a5568",fontSize:10,fontFamily:"inherit",cursor:"pointer",
-                                      borderColor:isSel?"#f59e0b":"#1e2a3a"}}
-                                    onMouseEnter={e=>{e.currentTarget.style.borderColor="#f59e0b";e.currentTarget.style.color="#f59e0b";}}
-                                    onMouseLeave={e=>{if(!isSel){e.currentTarget.style.borderColor="#1e2a3a";e.currentTarget.style.color="#4a5568";}}}>
-                                    {isSel?"✕":"→"}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })
-                  }
+            {/* Filas */}
+            <div style={{ maxHeight: "72vh", overflowY: "auto" }}>
+              {grouped.length === 0 && (
+                <div style={{ padding: 50, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+                  Sin resultados para "{filter}"
                 </div>
               )}
-              <div style={{padding:"7px 14px",borderTop:"1px solid #1e2a3a",display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:10,color:"#2d3748"}}>Clic en un fondo para ver gráfico y rentabilidades</span>
-                <span style={{...MONO,fontSize:10,color:"#2d3748"}}>{filtered.length} fondos</span>
+              {grouped.map(({ grp, funds }) => (
+                <div key={grp}>
+                  {activeGrp === "Todos" && (
+                    <div style={{ padding: "8px 16px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0",
+                      fontSize: 12, fontWeight: 600, color: "#475569", letterSpacing: ".04em" }}>
+                      {grp}
+                    </div>
+                  )}
+                  {funds.map(f => {
+                    const d    = details[f.isin];
+                    const l    = loading[f.isin];
+                    const err  = errors[f.isin];
+                    const nav  = d?.current_nav || d?.current_price;
+                    const isSel = selected === f.isin;
+                    const r1yUp = d?.return_1y != null ? d.return_1y >= 0 : null;
+
+                    return (
+                      <div key={f.isin}
+                        onClick={() => setSelected(isSel ? null : f.isin)}
+                        onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = "#f8fafc"; }}
+                        onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = "white"; }}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 88px 70px 70px 70px 70px 84px 12px",
+                          padding: "11px 16px", gap: 8, alignItems: "center", cursor: "pointer",
+                          background: isSel ? "#eff6ff" : "white",
+                          borderBottom: "1px solid #f1f5f9",
+                          borderLeft: `3px solid ${isSel ? "#3b82f6" : "transparent"}`,
+                          transition: "all .1s",
+                        }}>
+
+                        {/* Nombre */}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {d?.name || f.name}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, display: "flex", gap: 10 }}>
+                            <span>{f.mgr}</span>
+                            <span style={{ ...MONO }}>{f.isin}</span>
+                          </div>
+                        </div>
+
+                        {l ? (
+                          <div style={{ gridColumn: "2/8", height: 8, background: "#f1f5f9", borderRadius: 4,
+                            animation: "finect-pulse 1.5s ease-in-out infinite" }} />
+                        ) : d && nav ? (
+                          <>
+                            <div style={{ ...MONO, fontSize: 13, color: "#0f172a", textAlign: "right", fontWeight: 700 }}>{n4(nav)}</div>
+                            <div style={{ ...MONO, fontSize: 12, color: clr(d.change_pct), textAlign: "right", fontWeight: 600 }}>{pct(d.change_pct)}</div>
+                            <div style={{ ...MONO, fontSize: 12, color: clr(d.return_1m), textAlign: "right" }}>{pct(d.return_1m)}</div>
+                            <div style={{ ...MONO, fontSize: 12, color: clr(d.return_1y), textAlign: "right" }}>{pct(d.return_1y)}</div>
+                            <div style={{ ...MONO, fontSize: 12, color: clr(d.return_3y), textAlign: "right" }}>{pct(d.return_3y)}</div>
+                            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                              <Spark history={d.history} positive={r1yUp} />
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ gridColumn: "2/8", fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
+                            {err || "Sin datos"}
+                          </div>
+                        )}
+
+                        <div style={{ width: 8, height: 8, borderRadius: "50%",
+                          background: isSel ? "#3b82f6" : (d && nav ? "#16a34a" : "#e2e8f0"),
+                          margin: "0 auto" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            {/* Footer tabla */}
+            <div style={{ padding: "8px 16px", borderTop: "1px solid #e2e8f0", background: "#f8fafc",
+              display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: "#94a3b8" }}>
+                Clic en una fila para ver detalle, gráfica y cartera de posiciones
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 80, height: 3, background: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${catalog.length ? (loadedCount / catalog.length) * 100 : 0}%`,
+                    background: "#16a34a", transition: "width .4s" }} />
+                </div>
+                <span style={{ fontSize: 11, color: "#94a3b8" }}>{filtered.length} fondos</span>
               </div>
             </div>
           </div>
 
           {/* PANEL DETALLE */}
-          {selected&&(
+          {selected && (
             <DetailPanel
               key={selected}
               fund={selectedFund}
               detail={details[selected]}
               loading={loading[selected]}
               error={errors[selected]}
-              onClose={()=>setSelected(null)}
+              onClose={() => setSelected(null)}
             />
           )}
         </div>
 
-        <div style={{marginTop:14,padding:"8px 14px",background:"#111827",border:"1px solid #1e2a3a",
-          borderRadius:7,fontSize:10,color:"#334155"}}>
-          ℹ Los fondos de inversión actualizan su NAV una vez al día al cierre. Los ETFs (IWDA, VWCE, CSPX...) cotizan en tiempo real en bolsa. Datos vía Yahoo Finance.
+        <div style={{ marginTop: 12, fontSize: 11, color: "#cbd5e1", textAlign: "center" }}>
+          Datos: Morningstar · CNMV · NAV actualizado diariamente
         </div>
       </div>
     </div>

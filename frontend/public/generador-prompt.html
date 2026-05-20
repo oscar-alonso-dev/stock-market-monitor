@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Generador de Prompt V7 — Equity Research (BUY/HOLD/SELL + Score)</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --ink:#0b1220;
+      --muted:#5b667a;
+      --line:#e6e9ef;
+      --panel:#f7f9fc;
+      --blue:#0b3a78;
+      --gold:#d4af37;
+      --good:#1a7f37;
+      --warn:#b54708;
+      --bad:#b42318;
+      --shadow: 0 10px 30px rgba(11,18,32,.08);
+      --radius: 16px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--bg)}
+    header{
+      position:sticky;top:0;z-index:10;
+      background:linear-gradient(90deg, rgba(11,58,120,.06), rgba(212,175,55,.08));
+      border-bottom:1px solid var(--line);
+      backdrop-filter: blur(6px);
+    }
+    .wrap{max-width:1180px;margin:0 auto;padding:18px 18px}
+    .top{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .brand{display:flex;align-items:center;gap:12px}
+    .mark{
+      width:44px;height:44px;border-radius:14px;
+      background:linear-gradient(135deg,var(--blue),#133f7e);
+      box-shadow:var(--shadow);
+      position:relative;overflow:hidden
+    }
+    .mark:after{
+      content:"";position:absolute;inset:-20px;
+      background:radial-gradient(circle at 30% 30%, rgba(212,175,55,.9), rgba(212,175,55,0) 60%);
+      transform:rotate(18deg);
+    }
+    h1{font-size:16px;margin:0;letter-spacing:.2px}
+    .sub{margin:2px 0 0;color:var(--muted);font-size:12px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    button{
+      border:1px solid var(--line);background:#fff;color:var(--ink);
+      padding:10px 12px;border-radius:12px;cursor:pointer;
+      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+      font-weight:600;
+    }
+    button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+    button.ghost{background:transparent}
+    button:active{transform:translateY(1px)}
+    main{max-width:1180px;margin:0 auto;padding:18px}
+    .grid{display:grid;grid-template-columns: 1fr 1fr;gap:16px;align-items:start}
+    @media (max-width: 980px){ .grid{grid-template-columns:1fr} }
+    .card{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:#fff;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .card .hd{
+      padding:14px 14px;
+      border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(11,58,120,.06), rgba(255,255,255,0));
+      display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    }
+    .card .hd b{font-size:13px}
+    .card .bd{padding:14px}
+    .row{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
+    @media (max-width: 520px){ .row{grid-template-columns:1fr} }
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    select, input[type="text"], textarea{
+      width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 10px;
+      font-family:var(--sans);font-size:13px;background:#fff;outline:none
+    }
+    textarea{min-height:110px;resize:vertical}
+    .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.35}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+      background:var(--panel);font-size:12px;color:var(--muted)
+    }
+    .toggle{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .toggle input{transform:scale(1.1)}
+    .sep{height:1px;background:var(--line);margin:14px 0}
+    .advanced{display:none}
+    .advanced.show{display:block}
+    .twoBtns{display:flex;gap:10px;flex-wrap:wrap}
+    .mono{
+      font-family:var(--mono);
+      font-size:12px;
+      line-height:1.45;
+      white-space:pre-wrap;
+      background:#0b1220;
+      color:#e8eefc;
+      border-radius:14px;
+      padding:14px;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .badges{display:flex;gap:8px;flex-wrap:wrap}
+    .badge{font-size:11px;border-radius:999px;padding:5px 10px;border:1px solid var(--line);background:#fff}
+    .badge.good{border-color:rgba(26,127,55,.25);background:rgba(26,127,55,.06);color:var(--good)}
+    .badge.warn{border-color:rgba(181,71,8,.25);background:rgba(181,71,8,.06);color:var(--warn)}
+    .badge.bad{border-color:rgba(180,35,24,.25);background:rgba(180,35,24,.06);color:var(--bad)}
+    .footNote{font-size:11px;color:var(--muted);margin-top:10px}
+    .small{font-size:12px;color:var(--muted)}
+    .hintAlert{
+      margin-top:10px;
+      border:1px solid rgba(181,71,8,.25);
+      background:rgba(181,71,8,.06);
+      color:var(--warn);
+      padding:10px 12px;
+      border-radius:12px;
+      font-size:12px;
+      display:none;
+    }
+    .hintAlert.show{display:block}
+
+    /* Warning + Help */
+    .auditBox{
+      border:1px solid rgba(180,35,24,.25);
+      background:rgba(180,35,24,.06);
+      color:#7a1b16;
+      border-radius:14px;
+      padding:12px 12px;
+      margin-bottom:12px;
+    }
+    .auditBox b{display:block;font-size:13px;margin-bottom:6px}
+    .auditBox .txt{font-size:12px;line-height:1.35;color:#7a1b16}
+    .auditPrompt{
+      margin-top:10px;
+      background:#ffffff;
+      border:1px dashed rgba(180,35,24,.35);
+      border-radius:12px;
+      padding:10px;
+      font-family:var(--mono);
+      font-size:12px;
+      color:#5a0f0b;
+      white-space:pre-wrap;
+    }
+    .helpBox{
+      border:1px solid var(--line);
+      background:var(--panel);
+      border-radius:14px;
+      padding:12px 12px;
+      margin-top:12px;
+    }
+    details{
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fff;
+      padding:10px 12px;
+      margin-top:10px;
+    }
+    summary{
+      cursor:pointer;
+      font-weight:800;
+      font-size:12px;
+      color:var(--ink);
+      list-style:none;
+    }
+    summary::-webkit-details-marker{display:none}
+    .helpText{font-size:12px;color:var(--ink);line-height:1.45;margin-top:10px}
+    .helpText h3{margin:10px 0 6px;font-size:12px}
+    .helpText ul{margin:6px 0 10px 18px}
+    .helpText li{margin:4px 0}
+    .kbd{
+      font-family:var(--mono);
+      font-size:11px;
+      padding:2px 6px;
+      border:1px solid var(--line);
+      border-bottom-width:2px;
+      border-radius:8px;
+      background:#fff;
+      color:var(--muted);
+    }
+    .quickGrid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    @media (max-width: 620px){ .quickGrid{grid-template-columns:1fr} }
+    .qCard{
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fff;
+      padding:10px 12px;
+    }
+    .qCard b{font-size:12px}
+    .qCard .d{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.35}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <div class="mark"></div>
+        <div>
+          <h1>Generador de Prompt V7 — Equity Research (Score 1–100 + BUY/HOLD/SELL)</h1>
+          <div class="sub">Zorte On! Ortzi.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="ghost" id="btnPresetFund">Preset: Analista serio</button>
+        <button class="ghost" id="btnPresetBegin">Preset: Principiante</button>
+        <button class="ghost" id="btnPresetSwing">Preset: Swing/Trader</button>
+        <button class="primary" id="btnGenerate">Generar prompt</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+
+    <!-- LEFT: OPTIONS -->
+    <div class="card">
+      <div class="hd">
+        <b>Opciones del análisis</b>
+        <div class="badges">
+          <span class="badge good" id="modeBadge">EXHAUSTIVO</span>
+          <span class="badge" id="deliveryBadge">Chat</span>
+          <span class="badge warn" id="scoreBadge">Score 5 pilares</span>
+        </div>
+      </div>
+      <div class="bd">
+
+        <!-- A) Core -->
+        <div class="pill">A) Núcleo</div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Modo</label>
+            <select id="mode">
+              <option value="EXHAUSTIVO" selected>Exhaustivo</option>
+              <option value="RAPIDO">Rápido</option>
+            </select>
+            <div class="hint">Rápido = conciso (métricas clave, riesgos kill-switch, valoración proxy). Exhaustivo = checklist completo si hay datos suficientes.</div>
+          </div>
+
+          <div>
+            <label>Horizonte</label>
+            <select id="horizon">
+              <option value="Ninguno" selected>Ninguno (no definir horizonte)</option>
+              <option value="1–3 meses">1–3 meses</option>
+              <option value="6–12 meses">6–12 meses</option>
+              <option value="12–24 meses">12–24 meses</option>
+              <option value="3–5 años">3–5 años</option>
+            </select>
+            <div class="hint">Si eliges “Ninguno”, el análisis no debe forzar ventanas; catalizadores = “próximos hitos relevantes”.</div>
+          </div>
+
+          <div>
+            <label>Perfil</label>
+            <select id="profile">
+              <option value="Largo plazo" selected>Largo plazo</option>
+              <option value="Swing">Swing</option>
+              <option value="Trader">Trader</option>
+            </select>
+            <div class="hint">Impacto: ajusta peso del técnico, énfasis en catalizadores de corto plazo y tono de la tesis (táctica vs estructural).</div>
+          </div>
+
+          <div>
+            <label>Formato de salida</label>
+            <select id="format">
+              <option value="Ficha (bullets)" selected>Ficha (bullets)</option>
+              <option value="Memo institucional">Memo institucional</option>
+              <option value="Checklist operativo">Checklist operativo (tareas/chequeos)</option>
+            </select>
+            <div class="hint">
+              <b>Ficha (bullets)</b> = resumen directo: puntos clave con números, riesgos y catalizadores.<br/>
+              <b>Memo institucional</b> = narrativa corta (tono research), con mini conclusiones por sección (sin paja).<br/>
+              <b>Checklist operativo</b> = lista literal de tareas/chequeos (p.ej., “verificar X en el próximo 10-Q”).
+            </div>
+          </div>
+
+          <div>
+            <label>Nivel de lenguaje</label>
+            <select id="language">
+              <option value="Principiante">Principiante</option>
+              <option value="Intermedio" selected>Intermedio</option>
+              <option value="Pro">Pro</option>
+            </select>
+            <div class="hint">Principiante añade “Conclusión sencilla” + “Ejemplo” y define jerga en 1 frase la primera vez.</div>
+          </div>
+
+          <div>
+            <label>Formato de entrega</label>
+            <select id="delivery">
+              <option value="CHAT" selected>Presentar en chat</option>
+              <option value="HTML">Generar archivo HTML (autocontenido)</option>
+            </select>
+            <div class="hint">En “Archivo HTML” el prompt exige devolver SOLO un documento HTML completo (<!doctype html>…).</div>
+          </div>
+        </div>
+
+        <div class="sep"></div>
+
+        <!-- B) Valuation -->
+        <div class="pill">B) Valoración</div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Método</label>
+            <select id="valuationMethod">
+              <option value="TRIANGULACION" selected>Triangulación (DCF si se puede + PROXY + consenso)</option>
+              <option value="PROXY">Solo [PROXY] (múltiplos vs sector/histórico)</option>
+              <option value="DCF">DCF simplificado (si hay base)</option>
+            </select>
+            <div class="hint">Triangulación = método “pro”. Si faltan datos para DCF, debe caer a [PROXY].</div>
+          </div>
+          <div>
+            <label>Rigor de supuestos</label>
+            <select id="assumptionRigor">
+              <option value="Bajo">Bajo</option>
+              <option value="Medio" selected>Medio</option>
+              <option value="Alto">Alto (justifica WACC/g/márgenes con refs)</option>
+            </select>
+            <div class="hint">Alto → justificar WACC/g/márgenes con referencias (sector/histórico) y explicar divergencias.</div>
+          </div>
+        </div>
+        <div class="toggle" style="margin-top:10px">
+          <input type="checkbox" id="sensitivity"/>
+          <label for="sensitivity" style="margin:0">Sensibilidad bull/base/bear (solo recomendado en Exhaustivo)</label>
+        </div>
+
+        <div class="sep"></div>
+
+        <!-- C) Score -->
+        <div class="pill">C) Score 1–100</div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Score mode</label>
+            <select id="scoreMode">
+              <option value="5" selected>Estándar (5 pilares)</option>
+              <option value="3">Simplificado (3 pilares)</option>
+              <option value="CUSTOM">Personalizado (avanzado: define pilares y pesos)</option>
+            </select>
+            <div class="hint">5 = más completo. 3 = rápido. Custom = define pilares/pesos (1–10).</div>
+          </div>
+
+          <div>
+            <label>Umbrales score → rating</label>
+            <select id="scoreThresholds">
+              <option value="SOFT" selected>Sin umbrales duros (orientativo)</option>
+              <option value="AUTO">Automático (ej.: ≥70 BUY, 50–69 HOLD, &lt;50 SELL)</option>
+            </select>
+            <div class="hint">Automático: explica si aplicas umbrales tal cual o ajustas por riesgo asimétrico (kill-switch).</div>
+          </div>
+
+          <div>
+            <label>Penalización por falta de datos</label>
+            <select id="dataPenalty">
+              <option value="Conservadora">Conservadora</option>
+              <option value="Neutral" selected>Neutral</option>
+              <option value="Agresiva">Agresiva</option>
+            </select>
+            <div class="hint">Conservadora penaliza fuerte si faltan 2+ pilares o fuentes sólidas.</div>
+          </div>
+
+          <div>
+            <label>Umbrales (si Automático)</label>
+            <input type="text" id="thresholdText" value="BUY ≥70 | HOLD 50–69 | SELL <50"/>
+            <div class="hint">Puedes editar el ejemplo o dejarlo por defecto.</div>
+          </div>
+        </div>
+
+        <div class="advanced" id="customScoreBox" style="margin-top:10px">
+          <label>Pilares personalizados (uno por línea)</label>
+          <textarea id="customScoreText" placeholder="Ejemplo:
+Valoración y margen de seguridad | 8 | Precio vs FV/PROXY/PT, múltiplos vs sector/histórico
+Calidad del negocio | 8 | Moat cuantificado (margen bruto vs peers, NRR, cuota, ROIC)
+Balance y FCF | 7 | Liquidez, deuda neta/EBITDA, FCF margin
+Ejecución y guidance | 6 | Credibilidad guidance, crecimiento, ARR/subs
+Asimetría riesgo/retorno | 7 | Lectura global (sin repetir lista)"></textarea>
+          <div class="hint">Formato: <b>Nombre | peso(1–10) | descripción</b>. Si lo dejas vacío, cae a estándar y lo declara.</div>
+        </div>
+
+        <div class="sep"></div>
+
+        <!-- D) Benchmarks & peers -->
+        <div class="pill">D) Benchmarks y peers</div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Benchmark performance</label>
+            <select id="benchmark">
+              <option value="OFF">Off</option>
+              <option value="INDICE">Índice</option>
+              <option value="SECTOR">Sector ETF</option>
+              <option value="AMBOS" selected>Ambos (default)</option>
+            </select>
+            <div class="hint">“Ambos” separa alfa vs beta: ¿mercado/sector o empresa?</div>
+          </div>
+          <div>
+            <label>Peers</label>
+            <select id="peersMode">
+              <option value="AUTO" selected>Auto (si hay comparables buenos)</option>
+              <option value="OFF">Off</option>
+              <option value="MANUAL">Manual (yo pongo tickers)</option>
+            </select>
+            <div class="hint">Auto: si no hay comparables buenos, dilo y NO fuerces comparaciones.</div>
+          </div>
+        </div>
+        <div class="advanced" id="manualPeersBox" style="margin-top:10px">
+          <label>Peers (manual, separa por comas)</label>
+          <input type="text" id="manualPeers" placeholder="MSFT, GOOGL, AMZN"/>
+        </div>
+
+        <div class="sep"></div>
+
+        <!-- E) Technical -->
+        <div class="pill">E) Técnico</div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Nivel técnico</label>
+            <select id="techLevel">
+              <option value="OFF">Off (solo fundamental)</option>
+              <option value="BASICO" selected>Básico</option>
+              <option value="AVANZADO">Avanzado (estructura/volumen/patrones)</option>
+            </select>
+            <div class="hint">Avanzado añade contexto, pero NO debe convertirse en tesis independiente.</div>
+          </div>
+          <div>
+            <label>Uso del técnico</label>
+            <select id="techUse">
+              <option value="TIMING">Solo timing</option>
+              <option value="TIMING_RIESGO" selected>Timing + gestión de riesgo</option>
+            </select>
+            <div class="hint">Nunca debe cambiar BUY/HOLD/SELL por técnico: solo timing/gestión de riesgo.</div>
+          </div>
+          <div>
+            <label>Timeframes</label>
+            <select id="timeframes">
+              <option value="1D">1D</option>
+              <option value="1W">1W</option>
+              <option value="1D+1W" selected>1D + 1W (default)</option>
+              <option value="MULTI">Multi (1H–1D–1W)</option>
+            </select>
+          </div>
+          <div>
+            <label>Límite “anti-deriva”</label>
+            <select id="techGuard">
+              <option value="AUTO" selected>Auto (recomendado)</option>
+              <option value="STRICT">Estricto (técnico max 10–20% en perfil largo)</option>
+              <option value="OFF">Off</option>
+            </select>
+            <div class="hint">Si Perfil=Largo plazo + Técnico=Avanzado, limita el técnico a 10–20% y en bullets.</div>
+          </div>
+        </div>
+
+        <div id="techDriftAlert" class="hintAlert">
+          ⚠️ Perfil=Largo plazo + Técnico=Avanzado → regla anti-deriva activa: técnico máx. 10–20% en bullets, no como tesis.
+        </div>
+
+        <div class="sep"></div>
+
+        <!-- F) Risks & catalysts -->
+        <div class="pill">F) Riesgos / catalizadores / disciplina</div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Riesgos</label>
+            <select id="riskDepth">
+              <option value="TOP3">Top 3 kill-switch</option>
+              <option value="TOP5" selected>3–5 kill-switch + adicionales</option>
+            </select>
+            <div class="hint">Kill-switch = riesgos que rompen la tesis. Ordena por prob/impacto.</div>
+          </div>
+          <div>
+            <label>Ventana de catalizadores</label>
+            <select id="catalystWindow">
+              <option value="90d">90 días</option>
+              <option value="6m" selected>6 meses</option>
+              <option value="12m">12 meses</option>
+            </select>
+            <div class="hint">Alinea con horizonte: 90d es táctico si horizonte largo.</div>
+          </div>
+        </div>
+        <div class="toggle" style="margin-top:10px">
+          <input type="checkbox" id="riskMitigants" checked/>
+          <label for="riskMitigants" style="margin:0">Mitigantes en kill-switch (si existe) o [NO VERIF]</label>
+        </div>
+        <div class="toggle" style="margin-top:8px">
+          <input type="checkbox" id="exitCriteria" checked/>
+          <label for="exitCriteria" style="margin:0">Exit criteria (qué haría cambiar la tesis) — ON</label>
+        </div>
+        <div class="hint">En Swing/Trader, 1 exit criteria puede ser técnico (gestión de riesgo), sin cambiar la tesis fundamental.</div>
+
+        <div class="sep"></div>
+
+        <!-- G) ESG & red flags -->
+        <div class="pill">G) ESG / governance & red flags</div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Governance/ESG</label>
+            <select id="esg">
+              <option value="OFF">Off</option>
+              <option value="MATERIAL" selected>Material-only (default)</option>
+              <option value="EXPANDIDO">Expandido</option>
+            </select>
+            <div class="hint">Material-only = 1 línea si es material; si no, omite o [NO VERIF].</div>
+          </div>
+          <div>
+            <label>Red flags contables</label>
+            <select id="redFlags">
+              <option value="OFF">Off</option>
+              <option value="BASICO" selected>Básico</option>
+              <option value="AVANZADO">Avanzado</option>
+            </select>
+            <div class="hint">Básico = SBC/FCF vs beneficio/AR-inventario/ajustes. Avanzado = QoE y políticas contables (con evidencia).</div>
+          </div>
+        </div>
+
+        <div class="sep"></div>
+
+        <!-- Inputs -->
+        <div class="pill">Inputs (opcionales)</div>
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label>Ticker (opcional)</label>
+            <input type="text" id="ticker" value="" placeholder="Ej.: MSFT o $MSFT (puede quedar vacío)"/>
+            <div class="hint">Si lo dejas vacío, el prompt queda genérico para cualquier acción.</div>
+          </div>
+          <div>
+            <label>Mercado/moneda (opcional)</label>
+            <input type="text" id="market" value="" placeholder="NASDAQ / NYSE / BME / XETRA, USD/EUR…"/>
+          </div>
+        </div>
+
+        <div class="footNote">V7: añade guías de uso para Modo/Horizonte/Perfil/Formato/Lenguaje/Entrega/Valoración/Score/Peers/Benchmark/Técnico/Riesgos.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: OUTPUT -->
+    <div class="card">
+      <div class="hd">
+        <b>Prompt generado</b>
+        <div class="twoBtns">
+          <button id="btnCopy">Copiar prompt</button>
+          <button id="btnReset" class="ghost">Reset</button>
+        </div>
+      </div>
+      <div class="bd">
+
+        <!-- WARNING -->
+        <div class="auditBox">
+          <b>⚠️ IMPORTANTE — Audita SIEMPRE el archivo generado</b>
+          <div class="txt">
+            Aunque el prompt sea bueno, el resultado puede contener errores, proxies mal interpretados o datos no verificados.
+            Recomendación mínima: <b>pasar una auditoría posterior</b> y corregir con fuentes.
+          </div>
+          <div class="auditPrompt">Actúa como analista senior (20+ años) y auditor de informes.
+Voy a enviarte un archivo generado por IA (HTML/PDF/texto).
+
+1) Dime qué datos son VERÍDICOS vs DUDOSOS vs ERRÓNEOS (marca: [OK]/[REGULAR]/[MAL]).
+2) Señala dónde faltan fuentes y qué debería verificarse (lista de chequeo).
+3) Indica sesgos o conclusiones que no se sostienen con los datos.
+4) Devuélveme una versión corregida del informe (mismo formato), sin explicar el proceso.
+
+Regla: si un dato no está soportado por fuentes sólidas, marca [NO VERIF] o [NO DISPONIBLE].</div>
+        </div>
+
+        <div class="small">Copia y pega el prompt en ChatGPT. Incluye disclaimer + firma al final del análisis.</div>
+        <div class="sep"></div>
+
+        <textarea id="output" class="mono" spellcheck="false" style="width:100%;min-height:520px"></textarea>
+        <div class="hint" id="outHint"></div>
+
+        <!-- HELP -->
+        <div class="helpBox">
+          <div class="small"><b>Ayuda de uso:</b> guía completa para elegir opciones según lo que quieras conseguir.</div>
+
+          <div class="quickGrid">
+            <div class="qCard">
+              <b>Si quieres “vista rápida”</b>
+              <div class="d">Modo <span class="kbd">Rápido</span> · Valoración <span class="kbd">PROXY</span> · Score <span class="kbd">3 pilares</span> · Riesgos <span class="kbd">Top 3</span> · Técnico <span class="kbd">Off/Básico</span></div>
+            </div>
+            <div class="qCard">
+              <b>Si quieres “memo serio”</b>
+              <div class="d">Modo <span class="kbd">Exhaustivo</span> · Valoración <span class="kbd">Triangulación</span> · Score <span class="kbd">5 pilares</span> · Red flags <span class="kbd">Básico</span> · ESG <span class="kbd">Material-only</span></div>
+            </div>
+            <div class="qCard">
+              <b>Si haces Swing/Trader</b>
+              <div class="d">Horizonte <span class="kbd">1–3m</span> · Técnico <span class="kbd">Avanzado</span> + <span class="kbd">Timing+Riesgo</span> · Catalizadores <span class="kbd">90d</span> · Exit criteria <span class="kbd">ON</span></div>
+            </div>
+            <div class="qCard">
+              <b>Si es small cap / “huele raro”</b>
+              <div class="d">Red flags <span class="kbd">Avanzado</span> · Penalización datos <span class="kbd">Conservadora</span> · Peers <span class="kbd">Manual</span> (si Auto no encuentra buenos)</div>
+            </div>
+          </div>
+
+          <details>
+            <summary>🧭 Núcleo: Modo · Horizonte · Perfil · Formato · Lenguaje · Entrega</summary>
+            <div class="helpText">
+              <h3>Modo</h3>
+              <ul>
+                <li><b>Rápido</b>: cuando hay poca info, poco tiempo o solo quieres “señales clave”. Ideal para screening.</li>
+                <li><b>Exhaustivo</b>: cuando hay fuentes (IR/filings/transcripts), quieres trazabilidad y un “memo” completo.</li>
+              </ul>
+
+              <h3>Horizonte</h3>
+              <ul>
+                <li><b>Ninguno</b>: úsalo si solo quieres entender la empresa “sin reloj”. Catalizadores = próximos hitos, sin ventana fija.</li>
+                <li><b>1–3m / 6–12m</b>: para trading/swing, lectura más táctica, catalizadores cortos, técnico pesa más.</li>
+                <li><b>12–24m</b>: el “default” más práctico para research retail/serio.</li>
+                <li><b>3–5y</b>: tesis estructural; catalizadores de 90d se tratan como tácticos, no drivers centrales.</li>
+              </ul>
+
+              <h3>Perfil</h3>
+              <ul>
+                <li><b>Largo plazo</b>: la tesis manda; técnico solo matiza timing. Más foco en moat/ROIC/FCF y calidad.</li>
+                <li><b>Swing</b>: mezcla catalizadores y estructura; técnico y gestión de riesgo toman protagonismo.</li>
+                <li><b>Trader</b>: timing/riesgo; el análisis se vuelve más operativo (niveles, invalidaciones, volatilidad).</li>
+              </ul>
+
+              <h3>Formato de salida</h3>
+              <ul>
+                <li><b>Ficha (bullets)</b>: el mejor para decisión rápida (como tus ejemplos Buy/Sell).</li>
+                <li><b>Memo institucional</b>: útil si vas a compartirlo o guardarlo como “nota” (más narrativo, pero corto).</li>
+                <li><b>Checklist operativo</b>: para trabajo real: lista de tareas (“verificar X”, “comparar Y”, “revisar Z”).</li>
+              </ul>
+
+              <h3>Nivel de lenguaje</h3>
+              <ul>
+                <li><b>Principiante</b>: docencia. Añade conclusión simple + ejemplo, y define jerga al aparecer.</li>
+                <li><b>Intermedio</b>: balance ideal para uso diario.</li>
+                <li><b>Pro</b>: denso, sin “explicaciones de manual”; útil si ya dominas métricas.</li>
+              </ul>
+
+              <h3>Entrega</h3>
+              <ul>
+                <li><b>Chat</b>: para leer rápido y seguir conversando.</li>
+                <li><b>HTML</b>: para “estudiarlo más tarde”, imprimir/archivar y mantener estructura.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details>
+            <summary>💰 Valoración: método · rigor · sensibilidad (bull/base/bear)</summary>
+            <div class="helpText">
+              <h3>Método</h3>
+              <ul>
+                <li><b>Triangulación</b> (default): “modo pro”. Cruza DCF (si hay base), múltiplos [PROXY] y consenso/PT.</li>
+                <li><b>Solo [PROXY]</b>: cuando no hay base para DCF (poca historia, FCF negativo, datos escasos) o en modo rápido.</li>
+                <li><b>DCF simplificado</b>: útil si hay FCF/márgenes/capex/deuda razonables. Si no, debe caer a [PROXY].</li>
+              </ul>
+
+              <h3>Rigor de supuestos</h3>
+              <ul>
+                <li><b>Bajo</b>: “apta para screening”. Menciona supuestos sin defenderlos mucho.</li>
+                <li><b>Medio</b>: equilibrio (recomendado).</li>
+                <li><b>Alto</b>: cuando quieras auditar supuestos: WACC/g/márgenes justificados con histórico/sector y explicar divergencias.</li>
+              </ul>
+
+              <h3>Sensibilidad bull/base/bear</h3>
+              <ul>
+                <li>Úsala en <b>Exhaustivo</b> o cuando la valoración dependa mucho de 1–2 supuestos (margen, crecimiento, WACC).</li>
+                <li>En <b>Rápido</b>, solo si aporta claridad (mini tabla, no un DCF completo).</li>
+              </ul>
+            </div>
+          </details>
+
+          <details>
+            <summary>🧮 Score 1–100: modo · umbrales · penalización por datos · personalizado</summary>
+            <div class="helpText">
+              <h3>Score mode</h3>
+              <ul>
+                <li><b>5 pilares</b>: cuando tienes info decente y quieres una foto completa (calidad + ejecución + riesgos).</li>
+                <li><b>3 pilares</b>: cuando vas rápido o hay poca información. Reduce complejidad pero mantiene “lo importante”.</li>
+                <li><b>Custom</b>: cuando quieres tu propio framework (p.ej. más peso a balance o a moat). Si no defines pilares, cae a estándar.</li>
+              </ul>
+
+              <h3>Umbrales score → rating</h3>
+              <ul>
+                <li><b>Sin umbrales</b>: el score es descriptivo; el rating se decide con juicio y asimetría.</li>
+                <li><b>Automático</b>: útil si quieres consistencia (screening). Debe explicar si ajusta por riesgo asimétrico (kill-switch).</li>
+              </ul>
+
+              <h3>Penalización por falta de datos</h3>
+              <ul>
+                <li><b>Conservadora</b>: para small caps, poco cubiertas, o cuando te preocupa el sesgo optimista.</li>
+                <li><b>Neutral</b>: uso general.</li>
+                <li><b>Agresiva</b>: si aceptas operar con proxies y no quieres que falten datos “maten” el score.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details>
+            <summary>📊 Benchmarks y Peers: cuándo compararlos y cómo evitar comparables malos</summary>
+            <div class="helpText">
+              <h3>Benchmark performance</h3>
+              <ul>
+                <li><b>Off</b>: si la performance no aporta al caso.</li>
+                <li><b>Índice</b>: si quieres separar “movimiento mercado” vs empresa.</li>
+                <li><b>Sector ETF</b>: si el driver es sectorial (commodities, bancos, semis, etc.).</li>
+                <li><b>Ambos</b> (default): mejor para distinguir <b>alfa vs beta</b> sin quedarse en % sueltos.</li>
+              </ul>
+
+              <h3>Peers</h3>
+              <ul>
+                <li><b>Auto</b>: ideal si el sector es claro y hay comparables directos. Regla: si no hay buenos, decirlo.</li>
+                <li><b>Off</b>: si no quieres “ruido” comparativo o no hay peers sensatos.</li>
+                <li><b>Manual</b>: cuando tú sabes cuáles son los comparables correctos (muy útil para small/mid caps).</li>
+              </ul>
+            </div>
+          </details>
+
+          <details>
+            <summary>📈 Técnico: Off/Básico/Avanzado · uso · timeframes · anti-deriva</summary>
+            <div class="helpText">
+              <h3>Nivel técnico</h3>
+              <ul>
+                <li><b>Off</b>: si quieres 100% fundamental (muy útil en tesis long-term).</li>
+                <li><b>Básico</b>: suficiente para timing (RSI, MAs, soportes/resistencias).</li>
+                <li><b>Avanzado</b>: para Swing/Trader: estructura/volumen/patrones, pero sin convertirlo en tesis.</li>
+              </ul>
+
+              <h3>Uso del técnico</h3>
+              <ul>
+                <li><b>Solo timing</b>: entrada/salida aproximada, sin hablar de stops.</li>
+                <li><b>Timing + gestión de riesgo</b>: añade niveles de invalidación/stop lógico.</li>
+              </ul>
+
+              <h3>Timeframes</h3>
+              <ul>
+                <li><b>1D+1W</b> (default): el más estable para swing/long con timing.</li>
+                <li><b>Multi</b>: solo si operas intradía o quieres microestructura (Trader).</li>
+              </ul>
+
+              <h3>Anti-deriva</h3>
+              <ul>
+                <li><b>Auto</b>: si Perfil=Largo plazo + Técnico=Avanzado, limita a 10–20% en bullets.</li>
+                <li><b>Strict</b>: si quieres que SIEMPRE se cumpla el límite, incluso si el modelo “se embala”.</li>
+                <li><b>Off</b>: solo si tú controlas el output y no te importa el riesgo de exceso técnico.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details>
+            <summary>⚠️ Riesgos/Catalizadores/Disciplina: kill-switch · mitigantes · exit criteria · ventana</summary>
+            <div class="helpText">
+              <h3>Riesgos</h3>
+              <ul>
+                <li><b>Top 3</b>: perfecto en modo rápido (los 3 que rompen la tesis).</li>
+                <li><b>3–5 + adicionales</b>: para exhaustivo (más completo sin volverse genérico).</li>
+              </ul>
+
+              <h3>Mitigantes</h3>
+              <ul>
+                <li><b>ON</b>: recomendado. Evita lista catastrofista y muestra asimetría real (qué lo compensa).</li>
+                <li><b>OFF</b>: si no quieres alargar o no hay info fiable (se puede usar [NO VERIF]).</li>
+              </ul>
+
+              <h3>Exit criteria</h3>
+              <ul>
+                <li><b>ON</b>: recomendado para disciplina (qué haría cambiar la tesis). En Swing/Trader permite 1 criterio técnico.</li>
+                <li><b>OFF</b>: si es solo una “nota de lectura” y no un plan.</li>
+              </ul>
+
+              <h3>Ventana de catalizadores</h3>
+              <ul>
+                <li><b>90d</b>: para swing/trader y eventos cercanos (earnings, aprobaciones, launches).</li>
+                <li><b>6m–12m</b>: para 12–24m o tesis de re-rating gradual.</li>
+                <li>Si Horizonte = <b>Ninguno</b>, se usa como “próximos hitos” sin anclar la tesis a una ventana.</li>
+              </ul>
+            </div>
+          </details>
+
+          <!-- KEEP: ESG / Red flags (as in V6, unchanged) -->
+          <details>
+            <summary>📌 Governance/ESG — para qué sirve y cuándo usar cada opción</summary>
+            <div class="helpText">
+              <p><b>Para qué sirve:</b> capturar riesgos y señales “no financieras” que acaban afectando a márgenes, crecimiento, coste de capital, multas, licencias, reputación o continuidad del negocio. <b>Governance</b> suele ser lo más accionable (incentivos, consejo, conflictos, decisiones de capital).</p>
+
+              <h3>Opciones</h3>
+              <ul>
+                <li><b>Off</b>: no incluye el apartado. Útil en modo ultra-rápido o si estás seguro de que no es material. Riesgo: perder un “kill-switch”.</li>
+                <li><b>Material-only (default)</b>: solo 1 línea si hay algo relevante y con evidencia; si no, se omite o <b>[NO VERIF]</b>. Recomendado para informes “limpios”.</li>
+                <li><b>Expandido</b>: añade más detalle. Útil en sectores donde regulación/operativa pesa o si hay controversias. Riesgo: alargar si no hay evidencia.</li>
+              </ul>
+
+              <h3>Regla práctica</h3>
+              <ul>
+                <li>Profesional sin relleno → <b>Material-only</b>.</li>
+                <li>ESG/regulación parte de la tesis → <b>Expandido</b>.</li>
+                <li>Prisa extrema → <b>Off</b> (con cuidado).</li>
+              </ul>
+            </div>
+          </details>
+
+          <details>
+            <summary>🧾 Red flags contables — para qué sirve y cuándo usar cada opción</summary>
+            <div class="helpText">
+              <p><b>Para qué sirve:</b> detectar señales de baja calidad de resultados: beneficios inflados, caja peor de lo que parece, dilución, ajustes repetidos, capitalización agresiva, etc.</p>
+
+              <h3>Opciones</h3>
+              <ul>
+                <li><b>Off</b>: no revisa calidad de resultados. Solo si vas ultra-rápido y aceptas el riesgo.</li>
+                <li><b>Básico (default)</b>: scanner corto y muy útil. Recomendado en la mayoría de casos (especialmente small/mid caps y crecimiento con mucho non-GAAP).
+                  <ul>
+                    <li><b>SBC/dilución</b></li>
+                    <li><b>FCF vs beneficio</b></li>
+                    <li><b>Cash conversion</b></li>
+                    <li><b>Cuentas a cobrar / inventario</b> creciendo raro</li>
+                    <li><b>Ajustes “one-time”</b> recurrentes</li>
+                  </ul>
+                </li>
+                <li><b>Avanzado</b>: estilo “auditoría” (políticas contables, capitalización, quality of earnings). Útil si algo huele raro o decisión grande.</li>
+              </ul>
+
+              <h3>Regla práctica</h3>
+              <ul>
+                <li>Mínimo profesional → <b>Básico</b>.</li>
+                <li>Señales raras / small cap / muchos ajustes → <b>Avanzado</b>.</li>
+              </ul>
+            </div>
+          </details>
+
+          <details>
+            <summary>✅ Tip rápido: presets y cómo “tocarlos” sin liarla</summary>
+            <div class="helpText">
+              <ul>
+                <li>Empieza por un <b>preset</b> y luego ajusta 1–2 palancas (ej.: Técnico y Ventana de catalizadores).</li>
+                <li>Si cambias a <b>Custom score</b>, revisa que escribiste pilares/pesos (si no, caerá a estándar).</li>
+                <li>Si Perfil = <b>Largo plazo</b> y Técnico = <b>Avanzado</b>, deja <b>Anti-deriva</b> en Auto/Strict.</li>
+                <li>Si la empresa es poco cubierta, usa <b>Penalización de datos Conservadora</b> y considera <b>Peers Manual</b>.</li>
+              </ul>
+            </div>
+          </details>
+
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => (s || "").replace(/\r/g,"").trim();
+
+  function validateSelectValues(){
+    const mustExist = [
+      ["valuationMethod", ["TRIANGULACION","PROXY","DCF"]],
+      ["techLevel", ["OFF","BASICO","AVANZADO"]],
+      ["scoreMode", ["5","3","CUSTOM"]],
+      ["scoreThresholds", ["SOFT","AUTO"]],
+      ["peersMode", ["AUTO","OFF","MANUAL"]],
+      ["benchmark", ["OFF","INDICE","SECTOR","AMBOS"]],
+      ["riskDepth", ["TOP3","TOP5"]],
+      ["esg", ["OFF","MATERIAL","EXPANDIDO"]],
+      ["redFlags", ["OFF","BASICO","AVANZADO"]],
+      ["mode", ["EXHAUSTIVO","RAPIDO"]]
+    ];
+    for(const [id, vals] of mustExist){
+      const el = $(id);
+      if(!el) continue;
+      const options = Array.from(el.options).map(o=>o.value);
+      for(const v of vals){
+        if(!options.includes(v)){
+          console.warn("Value missing in select", id, "missing:", v);
+        }
+      }
+    }
+  }
+
+  function setBadge(){
+    const mode = $("mode").value;
+    $("modeBadge").textContent = mode;
+    $("modeBadge").className = "badge " + (mode==="EXHAUSTIVO" ? "good" : "warn");
+
+    const del = $("delivery").value;
+    $("deliveryBadge").textContent = (del==="HTML" ? "Archivo HTML" : "Chat");
+
+    const sm = $("scoreMode").value;
+    $("scoreBadge").textContent = (sm==="5" ? "Score 5 pilares" : sm==="3" ? "Score 3 pilares" : "Score personalizado");
+  }
+
+  function toggleAdvanced(){
+    $("customScoreBox").classList.toggle("show", $("scoreMode").value==="CUSTOM");
+    $("manualPeersBox").classList.toggle("show", $("peersMode").value==="MANUAL");
+  }
+
+  function updateTechDriftAlert(){
+    const show = ($("profile").value==="Largo plazo" && $("techLevel").value==="AVANZADO" && $("techGuard").value!=="OFF");
+    $("techDriftAlert").classList.toggle("show", show);
+  }
+
+  function coherenceNotes(mode, valuationMethod, scoreMode){
+    const notes = [];
+    if (mode==="RAPIDO" && valuationMethod==="TRIANGULACION"){
+      notes.push("Nota coherencia: MODO RÁPIDO + Triangulación. Mantén DCF solo si hay base MUY clara; si no, usa [PROXY] + consenso.");
+    }
+    if (mode==="RAPIDO" && scoreMode==="5"){
+      notes.push("Nota coherencia: MODO RÁPIDO + score 5 pilares. Manténlo ultra breve o considera 3 pilares si hay poca info.");
+    }
+    return notes;
+  }
+
+  // Presets
+  function nowPresetFund(){
+    $("mode").value="EXHAUSTIVO";
+    $("horizon").value="12–24 meses";
+    $("profile").value="Largo plazo";
+    $("format").value="Ficha (bullets)";
+    $("language").value="Intermedio";
+    $("delivery").value="CHAT";
+
+    $("valuationMethod").value="TRIANGULACION";
+    $("assumptionRigor").value="Medio";
+    $("sensitivity").checked=false;
+
+    $("scoreMode").value="5";
+    $("scoreThresholds").value="SOFT";
+    $("dataPenalty").value="Neutral";
+    $("thresholdText").value="BUY ≥70 | HOLD 50–69 | SELL <50";
+
+    $("benchmark").value="AMBOS";
+    $("peersMode").value="AUTO";
+    $("manualPeers").value="";
+
+    $("techLevel").value="BASICO";
+    $("techUse").value="TIMING_RIESGO";
+    $("timeframes").value="1D+1W";
+    $("techGuard").value="AUTO";
+
+    $("riskDepth").value="TOP5";
+    $("catalystWindow").value="6m";
+    $("riskMitigants").checked=true;
+    $("exitCriteria").checked=true;
+
+    $("esg").value="MATERIAL";
+    $("redFlags").value="BASICO";
+
+    toggleAdvanced(); setBadge(); updateTechDriftAlert();
+  }
+
+  function nowPresetBegin(){
+    $("mode").value="RAPIDO";
+    $("horizon").value="12–24 meses";
+    $("profile").value="Largo plazo";
+    $("format").value="Ficha (bullets)";
+    $("language").value="Principiante";
+    $("delivery").value="CHAT";
+
+    $("valuationMethod").value="PROXY";
+    $("assumptionRigor").value="Bajo";
+    $("sensitivity").checked=false;
+
+    $("scoreMode").value="3";
+    $("scoreThresholds").value="SOFT";
+    $("dataPenalty").value="Conservadora";
+    $("thresholdText").value="BUY ≥70 | HOLD 50–69 | SELL <50";
+
+    $("benchmark").value="AMBOS";
+    $("peersMode").value="OFF";
+    $("manualPeers").value="";
+
+    $("techLevel").value="BASICO";
+    $("techUse").value="TIMING";
+    $("timeframes").value="1D+1W";
+    $("techGuard").value="AUTO";
+
+    $("riskDepth").value="TOP3";
+    $("catalystWindow").value="6m";
+    $("riskMitigants").checked=true;
+    $("exitCriteria").checked=true;
+
+    $("esg").value="MATERIAL";
+    $("redFlags").value="OFF";
+
+    toggleAdvanced(); setBadge(); updateTechDriftAlert();
+  }
+
+  function nowPresetSwing(){
+    $("mode").value="RAPIDO";
+    $("horizon").value="1–3 meses";
+    $("profile").value="Swing";
+    $("format").value="Ficha (bullets)";
+    $("language").value="Intermedio";
+    $("delivery").value="CHAT";
+
+    $("valuationMethod").value="PROXY";
+    $("assumptionRigor").value="Medio";
+    $("sensitivity").checked=false;
+
+    $("scoreMode").value="3";
+    $("scoreThresholds").value="AUTO";
+    $("dataPenalty").value="Neutral";
+
+    $("benchmark").value="AMBOS";
+    $("peersMode").value="AUTO";
+    $("manualPeers").value="";
+
+    $("techLevel").value="AVANZADO";
+    $("techUse").value="TIMING_RIESGO";
+    $("timeframes").value="MULTI";
+    $("techGuard").value="AUTO";
+
+    $("riskDepth").value="TOP3";
+    $("catalystWindow").value="90d";
+    $("riskMitigants").checked=true;
+    $("exitCriteria").checked=true;
+
+    $("esg").value="MATERIAL";
+    $("redFlags").value="BASICO";
+
+    toggleAdvanced(); setBadge(); updateTechDriftAlert();
+  }
+
+  function buildPrompt(){
+    const rawTicker = esc($("ticker").value);
+    const ticker = rawTicker || "{TICKER}";
+    const tickerNoDollar = ticker.replace("$","");
+
+    const market = esc($("market").value);
+
+    const mode = $("mode").value;
+    const horizon = $("horizon").value;
+    const profile = $("profile").value;
+    const format = $("format").value;
+    const language = $("language").value;
+    const delivery = $("delivery").value;
+
+    const valuationMethod = $("valuationMethod").value;
+    const assumptionRigor = $("assumptionRigor").value;
+    const sensitivity = $("sensitivity").checked;
+
+    const scoreMode = $("scoreMode").value;
+    const scoreThresholds = $("scoreThresholds").value;
+    const thresholdText = esc($("thresholdText").value);
+    const dataPenalty = $("dataPenalty").value;
+
+    const benchmark = $("benchmark").value;
+    const peersMode = $("peersMode").value;
+    const manualPeers = esc($("manualPeers").value);
+
+    const techLevel = $("techLevel").value;
+    const techUse = $("techUse").value;
+    const timeframes = $("timeframes").value;
+    const techGuard = $("techGuard").value;
+
+    const riskDepth = $("riskDepth").value;
+    const catalystWindow = $("catalystWindow").value;
+    const riskMitigants = $("riskMitigants").checked;
+    const exitCriteria = $("exitCriteria").checked;
+
+    const esg = $("esg").value;
+    const redFlags = $("redFlags").value;
+
+    const coher = coherenceNotes(mode, valuationMethod, scoreMode);
+    const coherBlock = coher.length ? ("COHERENCIA (nota interna):\n- " + coher.join("\n- ") + "\n") : "";
+
+    // Benchmarks
+    let benchmarkInstruction = "";
+    if (benchmark==="OFF") benchmarkInstruction = "Benchmark performance: OFF.\n";
+    if (benchmark==="INDICE") benchmarkInstruction = "Benchmark performance: compara vs índice relevante.\n";
+    if (benchmark==="SECTOR") benchmarkInstruction = "Benchmark performance: compara vs sector ETF/sector.\n";
+    if (benchmark==="AMBOS") benchmarkInstruction = "Benchmark performance: compara vs índice y vs sector ETF/sector (alfa vs beta).\n";
+
+    // Peers
+    let peersInstruction = "";
+    if (peersMode==="OFF") peersInstruction = "Peers: OFF.\n";
+    if (peersMode==="AUTO") peersInstruction = "Peers: AUTO (si no hay comparables buenos, dilo y NO fuerces comparaciones débiles).\n";
+    if (peersMode==="MANUAL") peersInstruction = `Peers: MANUAL (${manualPeers || "[NO DISPONIBLE]"}).\n`;
+
+    // Anti-deriva técnica
+    let techGuardLine = "";
+    const driftCondition = (profile==="Largo plazo" && techLevel==="AVANZADO" && techGuard!=="OFF");
+    if (techGuard!=="OFF"){
+      if (techGuard==="STRICT"){
+        techGuardLine = "Regla anti-deriva técnica (STRICT): aunque el técnico sea avanzado, manténlo en 10–20% del contenido y en bullets; no lo conviertas en tesis independiente.\n";
+      } else if (driftCondition){
+        techGuardLine = "Regla anti-deriva técnica (AUTO): Perfil=Largo plazo + Técnico=Avanzado → técnico máx. 10–20% del contenido y en bullets; NO es tesis independiente.\n";
+      }
+    }
+
+    // Score pillars
+    function scorePillarsStandard(n){
+      if (n===3){
+        return [
+          "1) Valoración y margen de seguridad — Peso {1–10} — Sub-score {0–100}",
+          "2) Calidad del negocio (moat + pricing power) — Peso {1–10} — Sub-score {0–100}",
+          "3) Finanzas/balance + asimetría riesgo/retorno — Peso {1–10} — Sub-score {0–100} (lectura global, sin repetir lista)"
+        ].join("\n");
+      }
+      return [
+        "1) Valoración y margen de seguridad — Peso {1–10} — Sub-score {0–100}",
+        "2) Calidad del negocio (moat + pricing power) — Peso {1–10} — Sub-score {0–100}",
+        "3) Finanzas y balance (resiliencia) — Peso {1–10} — Sub-score {0–100}",
+        "4) Crecimiento y ejecución (guidance + señales) — Peso {1–10} — Sub-score {0–100}",
+        "5) Asimetría riesgo/retorno (lectura global) — Peso {1–10} — Sub-score {0–100} (resume sin repetir lista)"
+      ].join("\n");
+    }
+
+    let scorePillarsBlock = "";
+    const customScore = esc($("customScoreText").value);
+    if (scoreMode==="CUSTOM" && customScore){
+      scorePillarsBlock =
+`Pilares personalizados (del usuario):
+${customScore}
+Regla: respeta los pesos 1–10, calcula sub-scores 0–100 y score final por media ponderada.`;
+    } else if (scoreMode==="CUSTOM" && !customScore){
+      scorePillarsBlock =
+`Pilares personalizados: [NO DISPONIBLE] (no se han definido).
+Regla: usa pilares estándar de 5 pilares y DI EXPLÍCITAMENTE en la salida que has caído a estándar por falta de definición.`;
+    } else {
+      scorePillarsBlock = scorePillarsStandard(scoreMode==="3" ? 3 : 5);
+    }
+
+    // Threshold rule
+    let thresholdRule = "";
+    if (scoreThresholds==="AUTO"){
+      thresholdRule =
+`Umbrales score→rating: AUTOMÁTICO (${thresholdText || "BUY ≥70 | HOLD 50–69 | SELL <50"}).
+Regla: explica si aplicas umbrales tal cual o si ajustas por riesgo asimétrico (ej. mantener HOLD con score 72 si hay kill-switch de alta prob/impacto o downside muy asimétrico).`;
+    } else {
+      thresholdRule =
+`Umbrales score→rating: SIN UMBRALES DUROS (orientativo). Aclara en 1 línea cómo encaja el score con la etiqueta, sin reglas rígidas.`;
+    }
+
+    // Valuation
+    let valuationLine = "";
+    if (valuationMethod==="TRIANGULACION"){
+      valuationLine = "Valoración: triangulación (DCF si hay base + [PROXY] + consenso/PT si existe).";
+    } else if (valuationMethod==="PROXY"){
+      valuationLine = "Valoración: SOLO [PROXY] (múltiplos vs sector/histórico) y explicación breve.";
+    } else {
+      valuationLine = "Valoración: DCF simplificado si hay base; si no, [PROXY] y explícitalo.";
+    }
+
+    const sensitivityBlock = sensitivity
+      ? "Sensibilidad: ON (mini tabla bull/base/bear; muy breve en modo RÁPIDO)."
+      : "Sensibilidad: OFF.";
+
+    let rigorLine = `Rigor de supuestos: ${assumptionRigor}.`;
+    if (assumptionRigor.startsWith("Alto")){
+      rigorLine += " (Lista supuestos clave; justifica WACC/g/márgenes con refs; explica divergencias.)";
+    }
+
+    // Risks/catalysts
+    const riskLine = (riskDepth==="TOP3")
+      ? "Riesgos: TOP 3 kill-switch (Prob/Impacto)."
+      : "Riesgos: 3–5 kill-switch + 2–5 adicionales (Prob/Impacto).";
+
+    const mitigantsLine = riskMitigants
+      ? "Mitigantes: ON (para kill-switch, añade mitigante relevante o [NO VERIF])."
+      : "Mitigantes: OFF.";
+
+    const exitLine = exitCriteria
+      ? "Exit criteria: ON (1–3 condiciones claras y medibles)."
+      : "Exit criteria: OFF.";
+
+    const exitTraderNote = (exitCriteria && (profile==="Swing" || profile==="Trader"))
+      ? "Nota: En Swing/Trader, se permite que 1 exit criteria sea técnico (pérdida de nivel/cambio de estructura) SOLO como gestión de riesgo/timing."
+      : "";
+
+    let windowNote = "";
+    if (horizon==="Ninguno"){
+      windowNote = `Ventana de catalizadores: ${catalystWindow}. (Sin horizonte definido: “próximos hitos relevantes”, no driver por ventana).`;
+    } else {
+      windowNote = `Ventana de catalizadores: ${catalystWindow}. (Alinea con horizonte: 90d es táctico si horizonte largo).`;
+    }
+
+    const penaltyNote = `Penalización por falta de datos: ${dataPenalty}. (Baja el score si faltan 2+ pilares o fuentes sólidas).`;
+
+    // ESG/red flags
+    const esgLine = (esg==="OFF") ? "Governance/ESG: OFF."
+               : (esg==="MATERIAL") ? "Governance/ESG: Material-only (1 línea si es material; si no, omite o [NO VERIF])."
+               : "Governance/ESG: Expandido (solo con evidencia; evita paja).";
+
+    const redLine = (redFlags==="OFF") ? "Red flags contables: OFF."
+               : (redFlags==="BASICO") ? "Red flags contables: BÁSICO (SBC/dilución, FCF vs beneficio, cash conversion, AR/inventario, ajustes recurrentes)."
+               : "Red flags contables: AVANZADO (políticas contables, capitalización de costes, QoE, con evidencia).";
+
+    // Technical
+    let techLine = "";
+    if (techLevel==="OFF"){
+      techLine = "Técnico: OFF (análisis solo fundamental).";
+    } else if (techLevel==="BASICO"){
+      techLine = `Técnico: BÁSICO (RSI14 + 50/200 + 1–2 niveles) en ${timeframes}. Uso: ${techUse==="TIMING" ? "solo timing" : "timing + gestión de riesgo"}.`;
+    } else {
+      techLine = `Técnico: AVANZADO (estructura, volumen, niveles semanales, volatilidad, gaps/patrones simples) en ${timeframes}. Uso: ${techUse==="TIMING" ? "solo timing" : "timing + gestión de riesgo"}.`;
+    }
+
+    // Delivery
+    const deliveryInstruction = (delivery==="HTML")
+      ? "ENTREGA: Devuelve SOLO un ÚNICO documento HTML completo (<!doctype html>… con CSS/JS embebidos). Fondo blanco, estilo institucional, secciones claras. No añadas texto fuera del HTML. No expliques nada antes ni después. No incluyas markdown."
+      : "ENTREGA: Presenta el resultado en texto claro en el chat (sin envolverlo en HTML).";
+
+    // Format instruction
+    let formatInstruction = "";
+    if (format==="Checklist operativo"){
+      formatInstruction = "FORMATO: Checklist operativo (lista literal de tareas/chequeos accionables; cada bullet es un ‘to-do’ verificable).";
+    } else if (format==="Memo institucional"){
+      formatInstruction = "FORMATO: Memo institucional (narrativa breve + secciones tipo research; mini conclusiones por sección; sin paja).";
+    } else {
+      formatInstruction = "FORMATO: Ficha (bullets) directa y accionable.";
+    }
+
+    // Language (+ beginner extras)
+    let langInstruction = "";
+    let beginnerExtras = "";
+    if (language==="Principiante"){
+      langInstruction = "LENGUAJE: Principiante (frases cortas, define jerga en 1 línea, ejemplos simples). Regla: cuando uses términos técnicos (EBIT, FCF, ROIC, CET1, beta…), define cada uno en 1 frase sencilla la primera vez.";
+      beginnerExtras =
+`EXTRAS PARA PRINCIPIANTES (OBLIGATORIO):
+- Tras cada bloque principal: “Conclusión sencilla:” (1–2 frases) + “Ejemplo simple:” (1 frase/analogía: tienda/hipoteca/sueldo).
+- Enfócate en “qué significa” y “por qué importa”.`;
+    } else if (language==="Pro"){
+      langInstruction = "LENGUAJE: Pro (más denso, asume conocimientos; trazabilidad y precisión).";
+    } else {
+      langInstruction = "LENGUAJE: Intermedio (claro, define jerga cuando aparezca).";
+    }
+
+    const modeInstruction = (mode==="RAPIDO")
+      ? "MODO: RÁPIDO. Prioriza lo material, evita sobrecomplicar, usa proxies y sé conciso."
+      : "MODO: EXHAUSTIVO. Completa todos los apartados; si faltan datos, marca [NO DISPONIBLE]/[NO VERIF].";
+
+    const horizonLine = (horizon==="Ninguno")
+      ? "Horizonte: [NO DEFINIDO por el usuario]. No fuerces ventanas; tesis y catalizadores como “próximos hitos relevantes”."
+      : `Horizonte: ${horizon}.`;
+
+    const marketLine = market ? `Mercado/moneda: ${market}` : "Mercado/moneda: [opcional / si no se especifica, infiere con prudencia].";
+
+    const prompt =
+`[ROL]
+Actúa como analista senior de renta variable (20+ años). Sé crítico, equilibrado y evidencia-primero. Entrega un resumen accionable y auditable.
+
+[INPUT (único)]
+- Ticker: ${ticker}
+- ${marketLine}
+- ${horizonLine}
+
+[CONFIGURACIÓN DEL GENERADOR]
+${coherBlock}${modeInstruction}
+Perfil: ${profile}. (Ajusta peso del técnico, catalizadores de corto plazo y tono de la tesis: táctica vs estructural).
+${formatInstruction}
+${langInstruction}
+${deliveryInstruction}
+${beginnerExtras}
+
+[VALORACIÓN / SCORE]
+${valuationLine}
+${rigorLine}
+${sensitivityBlock}
+${penaltyNote}
+Score mode: ${scoreMode==="CUSTOM" ? "Personalizado" : (scoreMode==="3" ? "Simplificado (3 pilares)" : "Estándar (5 pilares)")}
+${thresholdRule}
+
+[COMPARABLES / BENCHMARKS]
+${benchmarkInstruction}${peersInstruction}
+
+[TÉCNICO]
+${techLine}
+${techGuardLine}
+
+[RIESGOS / CATALIZADORES]
+${riskLine}
+${mitigantsLine}
+${windowNote}
+${exitLine}
+${exitTraderNote}
+
+[GOVERNANCE/ESG + RED FLAGS]
+${esgLine}
+${redLine}
+
+========================================================
+REGLAS CRÍTICAS (OBLIGATORIAS)
+1) No inventes datos.
+   - [NO VERIF] = afirmaciones/percepciones sin soporte en fuentes sólidas.
+   - [NO DISPONIBLE] = el dato no existe o no se encuentra en fuentes razonables.
+2) Toda cifra relevante debe llevar Fuente (F1, F2, F3…).
+3) Prioridad de fuentes: IR/filings/transcripts > reguladores/bolsa > consenso > proveedores (TradingView/Finviz/Investing/Yahoo…).
+4) Si hay discrepancias: “Diferencia de fuentes” (1–3 líneas) + justificación.
+5) Alinea todo con el horizonte (si existe). Si NO hay horizonte, no ancles la tesis a una ventana fija.
+6) Técnico = contexto/timing: no cambies BUY/HOLD/SELL bien sustentado por fundamentales solo por técnico.
+
+========================================================
+FORMATO DE SALIDA (OBLIGATORIO)
+Devuelve EXACTAMENTE este orden y secciones:
+
+1) TÍTULO
+### {Nombre Empresa} (${tickerNoDollar}) – {BUY/HOLD/SELL}
+Modo: ${mode}. ${horizon==="Ninguno" ? "Horizonte: NO DEFINIDO (no forzar ventana)." : `Horizonte: ${horizon}.`} (Incluye cápsula sector/macro 1–2 líneas SOLO si material).
+
+2) FAIR VALUE / UPSIDE
+- Fair Value / Upside: {DCF o [PROXY]}, {PT consenso o [NO DISPONIBLE]}. Upside: {x}%–{y}%. (F1–F3)
+
+3) SCORE (1–100)
+- Score total: {0–100}
+- Pilares (pesos 1–10, sub-score 0–100):
+${scorePillarsBlock}
+- Cálculo: media ponderada. Penaliza por falta de datos.
+- Encaje score ↔ etiqueta: 1 línea.
+
+4) BLOQUES PRINCIPALES (con métricas y fuentes)
+- Modelo de Negocio: 2–3 líneas. (F1)
+- Ventaja Competitiva (moat cuantificado): 3–5 bullets + ≥1 métrica. (F1/F3 o [NO VERIF])
+- Solidez Financiera: 5–8 métricas con números. (F1/F2)
+- Calidad (ROIC/ROE/ROA o KPIs sectoriales). (F1/F2)
+- Management (+Governance/ESG si material): 1–3 bullets. (F1/F4 o [NO VERIF])
+- Ventas y Crecimiento/Guidance: FY/TTM, YoY, métrica recurrente, CAGR/guía + drivers. (F1/F2)
+- Mercado y competencia: drivers, cuota si existe, pricing, regulación subsector. (F3/F4)
+- Performance (si aplica): vs benchmark (alfa vs beta). (F2/F3)
+- Técnico (si ON): refuerza o matiza timing; no tesis independiente. (F2/F3)
+
+5) RIESGOS Y CATALIZADORES
+- Riesgos kill-switch: Riesgo — Prob(A/M/B) — Impacto(A/M/B) — Mitigante o [NO VERIF] (incluye ≥1 riesgo de valoración).
+- Catalizadores: Positivos/Negativos con hitos verificables.
+
+6) TESIS Y VEREDICTO {BUY/HOLD/SELL}
+- Tesis (1–2 frases).
+- 3–6 motivos, atados a 4 pilares: (i) FV/upside, (ii) calidad, (iii) balance, (iv) catalizadores.
+Regla: si falta evidencia en 2+ pilares → HOLD/Watchlist.
+
+7) (Opcional) EXIT CRITERIA (si ON)
+- 1–3 condiciones medibles.
+
+8) FUENTES
+- Fuentes: F1, F2, F3, F4… (según se hayan usado)
+
+9) DISCLAIMER + FIRMA
+_este contenido es solo para fines informativos y no constituye asesoramiento de inversión._
+
+`;
+
+    $("output").value = prompt;
+    $("outHint").textContent =
+      (delivery==="HTML")
+      ? "Entrega: Archivo HTML. El prompt exige devolver SOLO un HTML completo."
+      : "Entrega: Chat. El prompt pide formato claro en texto.";
+  }
+
+  // Events
+  const allControls = [
+    "mode","horizon","profile","format","language","delivery",
+    "valuationMethod","assumptionRigor","sensitivity",
+    "scoreMode","scoreThresholds","dataPenalty","thresholdText","customScoreText",
+    "benchmark","peersMode","manualPeers",
+    "techLevel","techUse","timeframes","techGuard",
+    "riskDepth","catalystWindow","riskMitigants","exitCriteria",
+    "esg","redFlags",
+    "ticker","market"
+  ];
+
+  allControls.forEach(id=>{
+    const el = $(id);
+    if(!el) return;
+    el.addEventListener("change", ()=>{
+      toggleAdvanced();
+      setBadge();
+      updateTechDriftAlert();
+    });
+    el.addEventListener("input", ()=>{
+      setBadge();
+      updateTechDriftAlert();
+    });
+  });
+
+  $("btnGenerate").addEventListener("click", buildPrompt);
+
+  $("btnCopy").addEventListener("click", async ()=>{
+    if(!($("output").value||"").trim()) buildPrompt();
+    try{
+      await navigator.clipboard.writeText($("output").value);
+      $("btnCopy").textContent = "Copiado ✓";
+      setTimeout(()=> $("btnCopy").textContent="Copiar prompt", 1100);
+    }catch(e){
+      alert("No se pudo copiar automáticamente. Selecciona el texto y copia manualmente.");
+    }
+  });
+
+  $("btnReset").addEventListener("click", ()=>{
+    $("ticker").value="";
+    $("market").value="";
+    nowPresetFund();
+    $("output").value="";
+    $("outHint").textContent="";
+    buildPrompt();
+  });
+
+  $("btnPresetFund").addEventListener("click", ()=>{ nowPresetFund(); buildPrompt(); });
+  $("btnPresetBegin").addEventListener("click", ()=>{ nowPresetBegin(); buildPrompt(); });
+  $("btnPresetSwing").addEventListener("click", ()=>{ nowPresetSwing(); buildPrompt(); });
+
+  // Init
+  validateSelectValues();
+  nowPresetFund();
+  toggleAdvanced();
+  setBadge();
+  updateTechDriftAlert();
+  buildPrompt();
+</script>
+</body>
+</html>

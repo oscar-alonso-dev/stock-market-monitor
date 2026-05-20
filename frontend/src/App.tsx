@@ -5,94 +5,116 @@ import Home from './Home';
 import Funds from './Funds';
 import Market from './Market';
 import Currency from './Currency';
+import Fundamentals from './Fundamentals';
+import IA from './IA';
 
 function App() {
-  const [view, setView] = useState<'home' | 'dashboard' | 'market' | 'portfolio' | 'funds' | 'currency'>('home');
-  const [analyzeSymbol, setAnalyzeSymbol] = useState<string | null>(null);
+  const [view, setView] = useState<'home' | 'dashboard' | 'market' | 'portfolio' | 'funds' | 'currency' | 'fundamentals' | 'ia'>('home');
+  const [analyzeSymbol,      setAnalyzeSymbol]      = useState<string | null>(null);
+  const [fundamentalsSymbol, setFundamentalsSymbol] = useState<string>("");
 
   const handleAnalyze = (symbol: string) => {
     setAnalyzeSymbol(symbol);
     setView('dashboard');
   };
 
+  const handleFundamentals = (symbol: string) => {
+    setFundamentalsSymbol(symbol);
+    setView('fundamentals');
+  };
+
   const handleNavigate = (v: string) => setView(v as any);
 
   const NAV = [
-    { key: 'home',      label: 'Inicio'      },
-    { key: 'market',    label: 'Mercado'     },
-    { key: 'dashboard', label: 'Análisis'    },
-    { key: 'funds',     label: 'Fondos'      },
-    { key: 'portfolio', label: 'Portfolio'   },
-    { key: 'currency',  label: 'Divisas'     },
+    { key: 'home',         label: 'Inicio'        },
+    { key: 'market',       label: 'Mercado'       },
+    { key: 'dashboard',    label: 'Análisis'      },
+    { key: 'funds',        label: 'Fondos'        },
+    { key: 'fundamentals', label: 'Fundamentales' },
+    { key: 'portfolio',    label: 'Portfolio'     },
+    { key: 'currency',     label: 'Divisas'       },
+    { key: 'ia',           label: 'IA'            },
   ];
 
   return (
-    <div>
+    <div style={{ background: "#f8fafc", minHeight: "100vh" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #0b0f18; }
-        ::-webkit-scrollbar-thumb { background: #1e2a3a; border-radius: 2px; }
-        body { background: #0b0f18; font-family: 'Inter', sans-serif; }
-        input::placeholder { color: #2a3a50; }
+        @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:.9} }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        body { background: #f8fafc; font-family: 'Inter', sans-serif; color: #0f172a; }
+        input::placeholder { color: #94a3b8; }
         input:focus { outline: none; }
         select { appearance: none; }
         a { text-decoration: none; }
         button { cursor: pointer; }
-        option { background: #111827; }
+        option { background: white; color: #0f172a; }
       `}</style>
 
       <nav style={{
-        background: "#0b0f18",
-        borderBottom: "1px solid #151e2d",
+        background: "white",
+        borderBottom: "1px solid #e2e8f0",
         padding: "0 24px",
         display: "flex",
         alignItems: "center",
-        height: "50px",
+        height: "54px",
         position: "sticky",
         top: 0,
         zIndex: 300,
+        boxShadow: "0 1px 3px rgba(0,0,0,.06)",
       }}>
-        {/* Logo */}
-        <div onClick={() => setView('home')} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "10px", marginRight: "24px" }}>
-          <div style={{ width: "30px", height: "30px", background: "linear-gradient(135deg, #f59e0b, #b45309)", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: "'JetBrains Mono'", fontSize: "11px", fontWeight: 500, color: "#000" }}>AU</span>
+        <div onClick={() => setView('home')} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "10px", marginRight: "32px" }}>
+          <div style={{
+            width: "32px", height: "32px",
+            background: "linear-gradient(135deg, #f59e0b, #b45309)",
+            borderRadius: "8px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 2px 8px rgba(245,158,11,.3)",
+          }}>
+            <span style={{ fontFamily: "'JetBrains Mono'", fontSize: "11px", fontWeight: 600, color: "#fff" }}>AU</span>
           </div>
-          <span style={{ fontFamily: "'JetBrains Mono'", fontSize: "14px", fontWeight: 500, color: "#e2e8f0", letterSpacing: "0.08em" }}>AURUM</span>
+          <span style={{ fontFamily: "'JetBrains Mono'", fontSize: "15px", fontWeight: 600, color: "#0f172a", letterSpacing: "0.06em" }}>AURUM</span>
         </div>
 
-        {/* Nav */}
-        <div style={{ display: "flex", height: "100%" }}>
+        <div style={{ display: "flex", height: "100%", gap: "2px" }}>
           {NAV.map(v => (
             <button key={v.key} onClick={() => setView(v.key as any)} style={{
-              background: "transparent", border: "none",
-              borderBottom: view === v.key ? "2px solid #f59e0b" : "2px solid transparent",
-              padding: "0 16px",
-              color: view === v.key ? "#e2e8f0" : "#4a5568",
-              fontSize: "13px", fontFamily: "'Inter', sans-serif",
+              background: "transparent",
+              border: "none",
+              borderBottom: view === v.key ? "2px solid #3b82f6" : "2px solid transparent",
+              padding: "0 14px",
+              color: view === v.key ? "#3b82f6" : "#64748b",
+              fontSize: "13px",
+              fontFamily: "'Inter', sans-serif",
               fontWeight: view === v.key ? 600 : 400,
-              transition: "all .15s", height: "100%",
+              transition: "all .15s",
+              height: "100%",
             }}>
               {v.label}
             </button>
           ))}
         </div>
 
-        {/* Live indicator */}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "5px" }}>
-          <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", animation: "blink 2s infinite" }} />
-          <span style={{ fontFamily: "'JetBrains Mono'", fontSize: "10px", color: "#2d3748", letterSpacing: "0.1em" }}>LIVE · 30s</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px" }}>
+          <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#16a34a", animation: "blink 2s infinite" }} />
+          <span style={{ fontFamily: "'JetBrains Mono'", fontSize: "10px", color: "#94a3b8", letterSpacing: "0.08em" }}>LIVE · 30s</span>
         </div>
       </nav>
 
-      {view === 'home'      && <Home onNavigate={handleNavigate} />}
-      {view === 'market'    && <Market onAnalyze={handleAnalyze} />}
-      {view === 'dashboard' && <StockDashboard initialSymbol={analyzeSymbol} />}
-      {view === 'funds'     && <Funds />}
-      {view === 'portfolio' && <Portfolio />}
-      {view === 'currency'  && <Currency />}
+      <div style={{ background: "#f8fafc", minHeight: "calc(100vh - 54px)" }}>
+        {view === 'home'         && <Home onNavigate={handleNavigate} />}
+        {view === 'market'       && <Market onAnalyze={handleAnalyze} />}
+        {view === 'dashboard'    && <StockDashboard initialSymbol={analyzeSymbol} />}
+        {view === 'funds'        && <Funds />}
+        {view === 'fundamentals' && <Fundamentals initialSymbol={fundamentalsSymbol} />}
+        {view === 'portfolio'    && <Portfolio />}
+        {view === 'currency'     && <Currency />}
+        {view === 'ia'           && <IA />}
+      </div>
     </div>
   );
 }
